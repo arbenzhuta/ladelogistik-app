@@ -121,13 +121,14 @@ function findMenge(data, sectionStart, sectionEnd, articleType) {
 
   // 1036/1038 marker: authoritative for Kanal/Schalldämpfer/Kanal-cut
   // (any byte alignment). The field id varies between MAJ variants (1036 or
-  // 1038); both store the quantity 12 bytes after the marker, with a 0 at +4.
+  // 1038); both store the quantity 12 bytes after the marker. The flag at +4
+  // is 0 in some variants and 1 in others.
   function find1036() {
     for (let i = sectionStart; i < sectionEnd - 30; i++) {
       const v = data[i] | (data[i+1] << 8) | (data[i+2] << 16) | ((data[i+3] << 24) >>> 0)
       if (v === 1036 || v === 1038) {
         const v2 = readUint32(data, i + 4)
-        if (v2 === 0) {
+        if (v2 === 0 || v2 === 1) {
           const menge = readUint32(data, i + 12)
           if (menge > 0 && menge < 10000) return menge
         }
