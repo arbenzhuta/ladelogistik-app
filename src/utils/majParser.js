@@ -197,6 +197,11 @@ function findPos(strings) {
     const t = s.text.trim()
     if (/^Fo\d+[A-Za-z*]?$/.test(t)) return t
   }
+  // Positionscode anderer MAJ-Varianten, z.B. 1.08_Z_AB4 oder 1.07_Z_ZU61
+  for (const s of strings) {
+    const t = s.text.trim()
+    if (/^\d+\.\d+_[A-Za-z0-9]+(_[A-Za-z0-9]+)*\*?$/.test(t)) return t
+  }
   return ''
 }
 

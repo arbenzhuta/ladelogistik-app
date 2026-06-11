@@ -167,32 +167,91 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
     }
   }
 
-  function tryPlaceKanalStehend(raum, item) {
+  // Höchste Oberkante aller Boxen, die die Grundfläche (x..x+padX, z..z+padZ)
+  // überlappen -> darauf wird gestapelt (Schwerkraft).
+  function kanalFootprintTop(raum, x, z, padX, padZ) {
+    let maxTop = 0
+    for (const p of raum.positionen) {
+      if (!p.box) continue
+      const a = p.box
+      if (a.x < x + padX && a.x + a.dx > x &&
+          a.z < z + padZ && a.z + a.dz > z) {
+        maxTop = Math.max(maxTop, a.y + a.dy)
+      }
+    }
+    return maxTop
+  }
+
+  // Platziert einen Kanal in der gegebenen Ausrichtung mit Schwerkraft:
+  // füllt zuerst den Boden (vorne -> hinten), stapelt dann auf vorhandene Stücke.
+  function placeKanalOriented(raum, item, orientation) {
+    const fz = getFahrzeug(raum.fahrzeugIndex)
+    const gap = 0.02
+    const air = 0.030 // 15mm Luft rundherum auf der Grundfläche
     const fL = mmToM(item.L)
     const fA = mmToM(item.a)
     const fB = mmToM(item.b)
-    // 15mm Luft rundherum auf a und b
-    const padA = fA + 0.030
-    const padB = fB + 0.030
+    let dx, dy, dz
+    if (orientation === 'stehend') {
+      dx = fA; dz = fB; dy = fL // hochkant: L nach oben
+    } else if (orientation === 'liegend') {
+      dx = fL; dz = fA; dy = fB
+    } else {
+      dx = fL; dz = fB; dy = fA // seitlich
+    }
+    const padX = dx + air
+    const padZ = dz + air
+    if (padX > fz.laenge - 2 * gap + 0.001) return false
+    if (padZ > fz.breite - 2 * gap + 0.001) return false
+    if (dy > fz.hoehe + 0.001) return false
 
-    // Kanal stehend: L nach oben (Y), Grundfläche a×b am Boden
-    if (tryFitKanal(raum, item, fA, fB, fL, padA, padB, fL, 'stehend')) return true
-    return false
+    let best = null
+    for (let x = gap; x <= fz.laenge - padX - gap + 0.001; x += 0.05) {
+      let rowBest = null
+      for (let z = gap; z <= fz.breite - padZ - gap + 0.001; z += 0.05) {
+        const yBase = kanalFootprintTop(raum, x, z, padX, padZ)
+        if (yBase + dy > fz.hoehe + 0.001) continue
+        const box = { x, y: yBase, z, dx: padX, dy, dz: padZ }
+        if (collides(raum.positionen, box)) continue
+        if (!rowBest || yBase < rowBest.yBase - 0.001 ||
+            (Math.abs(yBase - rowBest.yBase) <= 0.001 && z < rowBest.z)) {
+          rowBest = { x, z, yBase, box }
+        }
+      }
+      if (rowBest) {
+        if (!best || rowBest.yBase < best.yBase - 0.001 ||
+            (Math.abs(rowBest.yBase - best.yBase) <= 0.001 && x < best.x)) {
+          best = rowBest
+        }
+        // Boden-Platz möglichst weit vorne gefunden -> sofort nehmen
+        if (rowBest.yBase <= 0.001) break
+      }
+    }
+    if (!best) return false
+
+    const offsetX = (padX - dx) / 2
+    const offsetZ = (padZ - dz) / 2
+    raum.positionen.push({
+      type: 'box',
+      position: [best.x + offsetX + dx / 2, best.yBase + dy / 2, best.z + offsetZ + dz / 2],
+      size: [dx, dy, dz],
+      farbe: item.farbe,
+      name: item.name,
+      orientation,
+      box: best.box,
+    })
+    return true
+  }
+
+  function tryPlaceKanalStehend(raum, item) {
+    return placeKanalOriented(raum, item, 'stehend')
   }
 
   function tryPlaceKanalLiegend(raum, item) {
-    const fL = mmToM(item.L)
-    const fA = mmToM(item.a)
-    const fB = mmToM(item.b)
-    // 15mm Luft rundherum auf a und b
-    const padA = fA + 0.030
-    const padB = fB + 0.030
-
-    // Kanal liegend: L entlang LKW (X), a Breite (Z), b Höhe (Y)
-    if (tryFitKanal(raum, item, fL, fA, fB, fL, padA, padB, 'liegend')) return true
-    // Kanal seitlich: L entlang LKW (X), b Breite (Z), a Höhe (Y)
-    if (tryFitKanal(raum, item, fL, fB, fA, fL, padB, padA, 'seitlich')) return true
-    return false
+    return (
+      placeKanalOriented(raum, item, 'liegend') ||
+      placeKanalOriented(raum, item, 'seitlich')
+    )
   }
 
   function tryPlaceBox(raum, item) {
@@ -210,35 +269,6 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
     const d = mmToM(outer.durchmesser)
 
     if (tryFitCylinder(raum, spiroGroup, fL, d, d)) return true
-    return false
-  }
-
-  // Kanal placement with padding for 15mm air gap
-  function tryFitKanal(raum, item, renderX, renderZ, renderY, padX, padZ, padY, orientation) {
-    const gap = 0.02
-    const fz = getFahrzeug(raum.fahrzeugIndex)
-    const offsetX = (padX - renderX) / 2
-    const offsetZ = (padZ - renderZ) / 2
-
-    for (let y = 0; y <= fz.hoehe - padY + 0.001; y += 0.01) {
-      for (let x = gap; x <= fz.laenge - padX - gap + 0.001; x += 0.05) {
-        for (let z = gap; z <= fz.breite - padZ - gap + 0.001; z += 0.05) {
-          const box = { x, y, z, dx: padX, dy: padY, dz: padZ }
-          if (!collides(raum.positionen, box)) {
-            raum.positionen.push({
-              type: 'box',
-              position: [x + offsetX + renderX / 2, y + renderY / 2, z + offsetZ + renderZ / 2],
-              size: [renderX, renderY, renderZ],
-              farbe: item.farbe,
-              name: item.name,
-              orientation,
-              box,
-            })
-            return true
-          }
-        }
-      }
-    }
     return false
   }
 
@@ -362,10 +392,14 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
   let currentRaum = createNewRaum()
 
   const STRATS = [
-    { phaseOrder: ['spiro', 'kanal', 'sonstige'], kanalSort: null, kanalLiegendFirst: false },
+    // Standard: Kanäle hochkant, grosse Grundfläche zuerst (Boden füllen, dann stapeln)
+    { phaseOrder: ['spiro', 'kanal', 'sonstige'], kanalSort: (a, b) => b.a * b.b - a.a * a.b, kanalLiegendFirst: false },
+    // Hochkant, längste zuerst (hohe Stücke unten, kurze oben drauf)
+    { phaseOrder: ['spiro', 'kanal', 'sonstige'], kanalSort: (a, b) => b.L - a.L, kanalLiegendFirst: false },
+    // Hochkant, grösstes Volumen zuerst
     { phaseOrder: ['spiro', 'kanal', 'sonstige'], kanalSort: (a, b) => b.a * b.b * b.L - a.a * a.b * a.L, kanalLiegendFirst: false },
-    { phaseOrder: ['spiro', 'kanal', 'sonstige'], kanalSort: (a, b) => b.L - a.L, kanalLiegendFirst: true },
-    { phaseOrder: ['kanal', 'spiro', 'sonstige'], kanalSort: (a, b) => a.L - b.L, kanalLiegendFirst: false },
+    // Alternative: liegend zuerst (flach stapeln)
+    { phaseOrder: ['kanal', 'spiro', 'sonstige'], kanalSort: (a, b) => a.L - b.L, kanalLiegendFirst: true },
   ]
   const strat = STRATS[((variante % STRATS.length) + STRATS.length) % STRATS.length]
 
