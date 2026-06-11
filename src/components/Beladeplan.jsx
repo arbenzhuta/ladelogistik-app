@@ -100,7 +100,7 @@ function mmToM(mm) {
   return mm / 1000
 }
 
-function berechneBeladung(fahrzeugListe, frachtstuecke) {
+function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
   const raeume = []
   let raumIndex = 0
   const getFahrzeug = (idx) => fahrzeugListe[Math.min(idx, fahrzeugListe.length - 1)]
@@ -361,42 +361,57 @@ function berechneBeladung(fahrzeugListe, frachtstuecke) {
 
   let currentRaum = createNewRaum()
 
-  // Phase 1: Spiro ZUERST laden — am Boden hinten, von unten nach oben
+  const STRATS = [
+    { phaseOrder: ['spiro', 'kanal', 'sonstige'], kanalSort: null, kanalLiegendFirst: false },
+    { phaseOrder: ['spiro', 'kanal', 'sonstige'], kanalSort: (a, b) => b.a * b.b * b.L - a.a * a.b * a.L, kanalLiegendFirst: false },
+    { phaseOrder: ['spiro', 'kanal', 'sonstige'], kanalSort: (a, b) => b.L - a.L, kanalLiegendFirst: true },
+    { phaseOrder: ['kanal', 'spiro', 'sonstige'], kanalSort: (a, b) => a.L - b.L, kanalLiegendFirst: false },
+  ]
+  const strat = STRATS[((variante % STRATS.length) + STRATS.length) % STRATS.length]
+
   const spiroItems = allItems.filter((i) => i.phase === 'spiro')
-  for (const item of spiroItems) {
-    if (!tryPlaceSpiro(currentRaum, item.group)) {
-      if (currentRaum.positionen.length > 0) {
-        raeume.push(currentRaum)
-      }
-      currentRaum = createNewRaum()
-      tryPlaceSpiro(currentRaum, item.group)
-    }
-  }
-
-  // Phase 2: Kanäle platzieren — stehend, liegend, seitlich — alles versuchen
   const kanalItems = allItems.filter((i) => i.phase === 'kanal')
-  for (const item of kanalItems) {
-    const placed = tryPlaceKanalStehend(currentRaum, item) || tryPlaceKanalLiegend(currentRaum, item)
-    if (!placed) {
-      if (currentRaum.positionen.length > 0) {
-        raeume.push(currentRaum)
+  if (strat.kanalSort) kanalItems.sort(strat.kanalSort)
+  const sonstigeItems = allItems.filter((i) => i.phase === 'sonstige')
+
+  function runSpiro() {
+    for (const item of spiroItems) {
+      if (!tryPlaceSpiro(currentRaum, item.group)) {
+        if (currentRaum.positionen.length > 0) raeume.push(currentRaum)
+        currentRaum = createNewRaum()
+        tryPlaceSpiro(currentRaum, item.group)
       }
-      currentRaum = createNewRaum()
-      tryPlaceKanalStehend(currentRaum, item) || tryPlaceKanalLiegend(currentRaum, item)
     }
   }
 
-  // Phase 3: Sonstige (Konus etc.) platzieren
-  const sonstigeItems = allItems.filter((i) => i.phase === 'sonstige')
-  for (const item of sonstigeItems) {
-    if (!tryPlaceBox(currentRaum, item)) {
-      if (currentRaum.positionen.length > 0) {
-        raeume.push(currentRaum)
+  function placeKanal(item) {
+    return strat.kanalLiegendFirst
+      ? tryPlaceKanalLiegend(currentRaum, item) || tryPlaceKanalStehend(currentRaum, item)
+      : tryPlaceKanalStehend(currentRaum, item) || tryPlaceKanalLiegend(currentRaum, item)
+  }
+
+  function runKanal() {
+    for (const item of kanalItems) {
+      if (!placeKanal(item)) {
+        if (currentRaum.positionen.length > 0) raeume.push(currentRaum)
+        currentRaum = createNewRaum()
+        placeKanal(item)
       }
-      currentRaum = createNewRaum()
-      tryPlaceBox(currentRaum, item)
     }
   }
+
+  function runSonstige() {
+    for (const item of sonstigeItems) {
+      if (!tryPlaceBox(currentRaum, item)) {
+        if (currentRaum.positionen.length > 0) raeume.push(currentRaum)
+        currentRaum = createNewRaum()
+        tryPlaceBox(currentRaum, item)
+      }
+    }
+  }
+
+  const runners = { spiro: runSpiro, kanal: runKanal, sonstige: runSonstige }
+  for (const ph of strat.phaseOrder) runners[ph]()
 
   if (currentRaum.positionen.length > 0) {
     raeume.push(currentRaum)
@@ -404,6 +419,8 @@ function berechneBeladung(fahrzeugListe, frachtstuecke) {
 
   return raeume
 }
+
+const ANZAHL_VARIANTEN = 4
 
 function Scene({ fahrzeug, raum }) {
   if (!raum) return null
@@ -448,6 +465,7 @@ function Scene({ fahrzeug, raum }) {
 
 export default function Beladeplan({ fahrzeuge, selectedFahrzeug, frachtstuecke }) {
   const [raumFahrzeuge, setRaumFahrzeuge] = useState({})
+  const [variante, setVariante] = useState(0)
 
   const fahrzeugListe = useMemo(() => {
     const maxRaeume = 10
@@ -460,8 +478,8 @@ export default function Beladeplan({ fahrzeuge, selectedFahrzeug, frachtstuecke 
   }, [fahrzeuge, selectedFahrzeug, raumFahrzeuge])
 
   const raeume = useMemo(
-    () => berechneBeladung(fahrzeugListe, frachtstuecke),
-    [fahrzeugListe, frachtstuecke]
+    () => berechneBeladung(fahrzeugListe, frachtstuecke, variante),
+    [fahrzeugListe, frachtstuecke, variante]
   )
 
   const handleFahrzeugChange = useCallback((raumIdx, fzIdx) => {
@@ -477,6 +495,31 @@ export default function Beladeplan({ fahrzeuge, selectedFahrzeug, frachtstuecke 
 
   return (
     <div className="beladeplan-container">
+      {geladeneFracht.length > 0 && (
+        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+          <div>
+            <strong>Beladung</strong>
+            <span style={{ marginLeft: 8, color: '#888', fontSize: '0.85rem' }}>
+              Variante {(((variante % ANZAHL_VARIANTEN) + ANZAHL_VARIANTEN) % ANZAHL_VARIANTEN) + 1} / {ANZAHL_VARIANTEN}
+            </span>
+          </div>
+          <button
+            onClick={() => setVariante((v) => v + 1)}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 8,
+              border: 'none',
+              background: '#1a56db',
+              color: '#fff',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            🔄 Neu laden / andere Zusammensetzung
+          </button>
+        </div>
+      )}
       {raeume.length === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: 40 }}>
           <p style={{ color: '#888', fontSize: '1.1rem' }}>
