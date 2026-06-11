@@ -94,8 +94,13 @@ function findConsecutiveDimensions(data, start, end) {
       }
       if (group.length >= 2) {
         groups.push(group)
+        i = j
+      } else {
+        // Einzelwert war vermutlich ein fehl-ausgerichteter Zufallstreffer.
+        // Nicht bis j springen, sonst werden echte (8-Byte-ausgerichtete)
+        // Masszahlen direkt dahinter übersprungen.
+        i += 2
       }
-      i = j
     } else {
       i += 2
     }
