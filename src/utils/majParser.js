@@ -387,7 +387,8 @@ function parseSimpleMAJ(data, sectionStarts) {
           eingangB: k.eingangB,
           ausgangA: k.ausgangA,
           ausgangB: k.ausgangB,
-          versatz: k.versatz,
+          versatz1: k.versatz1,
+          versatz2: k.versatz2,
         }
       }
     }
@@ -404,9 +405,10 @@ function parseSimpleMAJ(data, sectionStarts) {
 
 // Konus / Etage: der Mass-Block ist eine Folge aufeinanderfolgender
 // 8-Byte-ausgerichteter Ganzzahl-Doubles:
-//   [EingangA, EingangB, AusgangA, AusgangB, L, Flansch, Flansch, Versatz]
-// Der Versatz darf negativ sein, daher werden in der Fortsetzung auch
-// negative Werte zugelassen.
+//   [Abm1 EingangA, Abm2 EingangB, Abm3 AusgangA, Abm4 AusgangB, Abm5 L,
+//    Abm6 Flansch, Abm7 Flansch, Abm8 Versatz1, Abm9 Versatz2, ...]
+// Die Versatz-Werte (Abm8/Abm9) dürfen negativ sein, daher werden in der
+// Fortsetzung auch negative Werte zugelassen.
 function findKonusDimensions(data, start, end) {
   let i = start
   const groups = []
@@ -420,7 +422,7 @@ function findKonusDimensions(data, start, end) {
         if (n >= -10000 && n <= 10000 && n === Math.floor(n)) {
           g.push(n)
           j += 8
-          if (g.length >= 8) break
+          if (g.length >= 12) break
         } else {
           break
         }
@@ -443,7 +445,8 @@ function findKonusDimensions(data, start, end) {
         ausgangA: g[2],
         ausgangB: g[3],
         L: g[4],
-        versatz: g.length >= 8 ? Math.abs(g[7]) : 0,
+        versatz1: g.length >= 8 ? g[7] : 0,
+        versatz2: g.length >= 9 ? g[8] : 0,
       }
     }
   }

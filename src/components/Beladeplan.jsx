@@ -79,18 +79,19 @@ function FrachtBox({ position, size, farbe, name }) {
   )
 }
 
-function FrachtKonus({ position, size, eingang, ausgang, versatz, farbe, name }) {
+function FrachtKonus({ position, size, eingang, ausgang, versatz1, versatz2, farbe, name }) {
   const geom = useMemo(() => {
     const hL = size[0] / 2
     const za = mmToM(eingang.a) / 2
     const yb = mmToM(eingang.b) / 2
     const za2 = mmToM(ausgang.a) / 2
     const yb2 = mmToM(ausgang.b) / 2
-    const vy = mmToM(versatz)
-    // Eingang (x=-hL) zentriert, Ausgang (x=+hL) um den Versatz in der Höhe verschoben
+    const vz = mmToM(versatz1) // Versatz 1 = seitlich (Z)
+    const vy = mmToM(versatz2) // Versatz 2 = Höhe (Y)
+    // Eingang (x=-hL) zentriert, Ausgang (x=+hL) um beide Versatz verschoben
     const V = [
       [-hL, -yb, -za], [-hL, -yb, za], [-hL, yb, za], [-hL, yb, -za],
-      [hL, vy - yb2, -za2], [hL, vy - yb2, za2], [hL, vy + yb2, za2], [hL, vy + yb2, -za2],
+      [hL, vy - yb2, vz - za2], [hL, vy - yb2, vz + za2], [hL, vy + yb2, vz + za2], [hL, vy + yb2, vz - za2],
     ]
     const idx = [
       0, 1, 2, 0, 2, 3, // Eingang
@@ -110,7 +111,7 @@ function FrachtKonus({ position, size, eingang, ausgang, versatz, farbe, name })
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
     g.computeVertexNormals()
     return g
-  }, [size, eingang, ausgang, versatz])
+  }, [size, eingang, ausgang, versatz1, versatz2])
   return (
     <group position={position}>
       <mesh geometry={geom}>
@@ -341,7 +342,8 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
             if (item.typ === 'konus') {
               placed.eingang = { a: item.eingangA, b: item.eingangB }
               placed.ausgang = { a: item.ausgangA, b: item.ausgangB }
-              placed.versatz = item.versatz
+              placed.versatz1 = item.versatz1
+              placed.versatz2 = item.versatz2
             }
             raum.positionen.push(placed)
             return true
@@ -533,7 +535,8 @@ function Scene({ fahrzeug, raum }) {
               size={p.size}
               eingang={p.eingang}
               ausgang={p.ausgang}
-              versatz={p.versatz}
+              versatz1={p.versatz1}
+              versatz2={p.versatz2}
               farbe={p.farbe}
               name={p.name}
             />
