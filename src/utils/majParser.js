@@ -272,6 +272,10 @@ function parseSimpleMAJ(data, sectionStarts) {
     const name = findArticleName(strings, articleType)
     const pos = findPos(strings)
 
+    // Positionen mit Stern (z.B. 1.08_Z_ZU15*) sind Sonder-/Doppel-Einträge
+    // ohne gültigen Mass-Block -> nicht importieren.
+    if (pos && pos.endsWith('*')) continue
+
     const menge = findMenge(data, start, end, articleType.type)
     const dimGroups = findConsecutiveDimensions(data, start, end)
 
