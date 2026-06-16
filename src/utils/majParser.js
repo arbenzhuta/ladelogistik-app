@@ -529,15 +529,15 @@ function findBogenDimensions(data, start, end, reduziert) {
   const isGrad = (x) => x >= 10 && x <= 180
   for (const g of groups) {
     if (reduziert) {
-      // [AusgangA, B, EingangA, Grad, S1, S2, Rundung]
+      // [EingangA, EingangB, AusgangA, Grad, S1, S2, Rundung]
       if (g.length >= 6 && g[0] >= 50 && g[1] >= 50 && g[2] >= 50 && isGrad(g[3])) {
         const f1 = g[4]
         const f2 = g[5]
         const rund = g.length >= 7 ? g[6] : 0
         return {
-          eingangA: g[2],
+          eingangA: g[0],
           eingangB: g[1],
-          ausgangA: g[0],
+          ausgangA: g[2],
           ausgangB: g[1],
           grad: g[3],
           f1,
