@@ -567,34 +567,35 @@ function findBogenDimensions(data, start, end, reduziert) {
   return null
 }
 
-// Numerisches Huellmass des Bogens: Mittellinie (Schenkel + Bogen + Schenkel)
-// abtasten und um den halben Querschnitt erweitern.
+// Numerisches Huellmass des Bogens: Viertel-Ring (Annulus). Innenradius
+// konstant, Querschnitt liegt nach aussen; beim reduzierten Bogen weitet
+// sich der Aussenradius vom Eingang zum Ausgang.
 function bogenBoundingBox(bo) {
-  const a = Math.max(bo.eingangA, bo.ausgangA)
+  const Ri = bo.radius
+  const wEin = bo.eingangA
+  const wAus = bo.ausgangA
   const b = bo.eingangB
-  const R = bo.radius
   const theta = (bo.grad * Math.PI) / 180
-  const pts = []
-  pts.push([0, 0])
-  pts.push([bo.f1, 0])
-  const N = 24
-  for (let k = 0; k <= N; k++) {
-    const al = (theta * k) / N
-    pts.push([bo.f1 + R * Math.sin(al), R - R * Math.cos(al)])
+  const N = 40
+  let minu = Infinity, maxu = -Infinity, minv = Infinity, maxv = -Infinity
+  const add = (x, y) => {
+    if (x < minu) minu = x
+    if (x > maxu) maxu = x
+    if (y < minv) minv = y
+    if (y > maxv) maxv = y
   }
-  const ex = bo.f1 + R * Math.sin(theta)
-  const ez = R - R * Math.cos(theta)
-  pts.push([ex + bo.f2 * Math.cos(theta), ez + bo.f2 * Math.sin(theta)])
-  let minx = Infinity, maxx = -Infinity, minz = Infinity, maxz = -Infinity
-  for (const [x, z] of pts) {
-    if (x < minx) minx = x
-    if (x > maxx) maxx = x
-    if (z < minz) minz = z
-    if (z > maxz) maxz = z
+  for (let k = 0; k <= N; k++) {
+    const t = (theta * k) / N
+    const r = Ri + wEin + (wAus - wEin) * (k / N)
+    add(r * Math.cos(t), r * Math.sin(t))
+  }
+  for (let k = N; k >= 0; k--) {
+    const t = (theta * k) / N
+    add(Ri * Math.cos(t), Ri * Math.sin(t))
   }
   return {
-    L: Math.ceil(maxx - minx + a),
-    a: Math.ceil(maxz - minz + a),
+    L: Math.ceil(maxu - minu),
+    a: Math.ceil(maxv - minv),
     b: Math.ceil(b),
   }
 }

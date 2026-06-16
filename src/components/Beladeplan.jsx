@@ -131,38 +131,38 @@ function FrachtKonus({ position, size, eingang, ausgang, versatz1, versatz2, far
   )
 }
 
-function FrachtBogen({ position, size, eingangA, eingangB, ausgangA, grad, radius, schenkel1, schenkel2, farbe, name }) {
+function FrachtBogen({ position, size, eingangA, eingangB, ausgangA, grad, radius, farbe, name }) {
   const geom = useMemo(() => {
-    const a = mmToM(Math.max(eingangA, ausgangA))
+    // Viertel-Ring: Innenradius Ri konstant, Querschnitt nach aussen.
+    // Reduzierter Bogen: Aussenradius weitet sich vom Eingang zum Ausgang.
+    const Ri = mmToM(radius)
+    const wEin = mmToM(eingangA)
+    const wAus = mmToM(ausgangA)
     const b = mmToM(eingangB)
-    const R = mmToM(radius)
-    const f1 = mmToM(schenkel1)
-    const f2 = mmToM(schenkel2)
     const theta = (grad * Math.PI) / 180
-    // Mittellinie: gerader Schenkel -> Bogen (Radius R) -> gerader Schenkel
-    const pts = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(f1, 0, 0)]
-    const N = 24
-    for (let k = 1; k <= N; k++) {
-      const al = (theta * k) / N
-      pts.push(new THREE.Vector3(f1 + R * Math.sin(al), 0, R - R * Math.cos(al)))
-    }
-    const ex = f1 + R * Math.sin(theta)
-    const ez = R - R * Math.cos(theta)
-    pts.push(new THREE.Vector3(ex + f2 * Math.cos(theta), 0, ez + f2 * Math.sin(theta)))
-    const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0)
+    const N = 48
     const shape = new THREE.Shape()
-    shape.moveTo(-a / 2, -b / 2)
-    shape.lineTo(a / 2, -b / 2)
-    shape.lineTo(a / 2, b / 2)
-    shape.lineTo(-a / 2, b / 2)
+    for (let k = 0; k <= N; k++) {
+      const t = (theta * k) / N
+      const r = Ri + wEin + (wAus - wEin) * (k / N)
+      const x = r * Math.cos(t)
+      const y = r * Math.sin(t)
+      if (k === 0) shape.moveTo(x, y)
+      else shape.lineTo(x, y)
+    }
+    for (let k = N; k >= 0; k--) {
+      const t = (theta * k) / N
+      shape.lineTo(Ri * Math.cos(t), Ri * Math.sin(t))
+    }
     shape.closePath()
-    const g = new THREE.ExtrudeGeometry(shape, { extrudePath: curve, steps: 64, bevelEnabled: false })
+    const g = new THREE.ExtrudeGeometry(shape, { depth: b, bevelEnabled: false })
+    g.rotateX(-Math.PI / 2) // Querschnitt-Hoehe b nach oben (Y)
     g.computeBoundingBox()
     const c = new THREE.Vector3()
     g.boundingBox.getCenter(c)
     g.translate(-c.x, -c.y, -c.z)
     return g
-  }, [eingangA, eingangB, ausgangA, grad, radius, schenkel1, schenkel2])
+  }, [eingangA, eingangB, ausgangA, grad, radius])
   return (
     <group position={position}>
       <mesh geometry={geom}>
