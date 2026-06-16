@@ -88,10 +88,14 @@ function FrachtKonus({ position, size, eingang, ausgang, versatz1, versatz2, far
     const yb2 = mmToM(ausgang.b) / 2
     const vz = mmToM(versatz1) // Versatz 1 = seitlich (Z)
     const vy = mmToM(versatz2) // Versatz 2 = Höhe (Y)
-    // Eingang (x=-hL) zentriert, Ausgang (x=+hL) um beide Versatz verschoben
+    // Hüllmass-Mitte (inkl. Versatz), damit das Stück mittig im Kollisions-
+    // volumen (size) sitzt und sich Konusse nicht durchdringen.
+    const cz = (Math.min(-za, vz - za2) + Math.max(za, vz + za2)) / 2
+    const cy = (Math.min(-yb, vy - yb2) + Math.max(yb, vy + yb2)) / 2
+    // Eingang (x=-hL) und Ausgang (x=+hL), beide um die Hüllmitte verschoben
     const V = [
-      [-hL, -yb, -za], [-hL, -yb, za], [-hL, yb, za], [-hL, yb, -za],
-      [hL, vy - yb2, vz - za2], [hL, vy - yb2, vz + za2], [hL, vy + yb2, vz + za2], [hL, vy + yb2, vz - za2],
+      [-hL, -yb - cy, -za - cz], [-hL, -yb - cy, za - cz], [-hL, yb - cy, za - cz], [-hL, yb - cy, -za - cz],
+      [hL, vy - yb2 - cy, vz - za2 - cz], [hL, vy - yb2 - cy, vz + za2 - cz], [hL, vy + yb2 - cy, vz + za2 - cz], [hL, vy + yb2 - cy, vz - za2 - cz],
     ]
     const idx = [
       0, 1, 2, 0, 2, 3, // Eingang

@@ -374,8 +374,15 @@ function parseSimpleMAJ(data, sectionStarts) {
     } else if (articleType.type === 'konus') {
       const k = findKonusDimensions(data, start, end)
       if (k) {
-        const a = Math.max(k.eingangA, k.ausgangA)
-        const b = Math.max(k.eingangB, k.ausgangB)
+        // Huellmass inkl. beider Versatz: Ein- und Ausgang ueberlagern, damit
+        // das Kollisions-/Stapel-Volumen das gesamte versetzte verjuengte
+        // Stueck umschliesst (Konusse duerfen sich nicht durchdringen).
+        const zMin = Math.min(-k.eingangA / 2, k.versatz1 - k.ausgangA / 2)
+        const zMax = Math.max(k.eingangA / 2, k.versatz1 + k.ausgangA / 2)
+        const yMin = Math.min(-k.eingangB / 2, k.versatz2 - k.ausgangB / 2)
+        const yMax = Math.max(k.eingangB / 2, k.versatz2 + k.ausgangB / 2)
+        const a = Math.ceil(zMax - zMin)
+        const b = Math.ceil(yMax - yMin)
         article = {
           typ: 'konus',
           name: 'Konus',
