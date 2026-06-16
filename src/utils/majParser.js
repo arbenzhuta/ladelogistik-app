@@ -142,13 +142,35 @@ function findMenge(data, sectionStart, sectionEnd, articleType) {
     return null
   }
 
+  // Strict quantity marker (used by Konus and Bogen/Bogen-Red.). The field id
+  // varies between article types/variants (e.g. 1036, 1060, 1076) but always
+  // sits in the 1000..2000 range and has the layout
+  // [id, flag(0/1), 1, menge, 0]. Universal: no hardcoded id per file.
+  function findStrict() {
+    for (let i = sectionStart; i < sectionEnd - 20; i++) {
+      const id = data[i] | (data[i+1] << 8) | (data[i+2] << 16) | ((data[i+3] << 24) >>> 0)
+      if (id >= 1000 && id < 2000) {
+        const flag = readUint32(data, i + 4)
+        if ((flag === 0 || flag === 1) && readUint32(data, i + 8) === 1 && readUint32(data, i + 16) === 0) {
+          const menge = readUint32(data, i + 12)
+          if (menge > 0 && menge < 10000) return menge
+        }
+      }
+    }
+    return null
+  }
+
   // Priority depends on article type
   if (articleType === 'spiro') {
     const m876 = find876()
     if (m876 !== null) return m876
+    const mStrict = findStrict()
+    if (mStrict !== null) return mStrict
     const m1036 = find1036()
     if (m1036 !== null) return m1036
   } else {
+    const mStrict = findStrict()
+    if (mStrict !== null) return mStrict
     const m1036 = find1036()
     if (m1036 !== null) return m1036
     const m876 = find876()
@@ -212,7 +234,7 @@ function detectArticleType(strings) {
   return null
 }
 
-function findPos(strings) {
+function findPos(strings, data, sectionStart, sectionEnd) {
   for (const s of strings) {
     const t = s.text.trim()
     if (/^Fo\d+[A-Za-z*]?$/.test(t)) return t
@@ -221,6 +243,37 @@ function findPos(strings) {
   for (const s of strings) {
     const t = s.text.trim()
     if (/^\d+\.\d+_[A-Za-z0-9]+(_[A-Za-z0-9]+)*\*?$/.test(t)) return t
+  }
+  // Reine Zahlen-Position (z.B. "12") steht als kurzer String im Kopf der
+  // Sektion und wird vom normalen String-Leser (min. 3 Zeichen) verworfen.
+  // Daher hier direkt im Kopfbereich nach der ersten reinen Zahl suchen.
+  if (data) {
+    const num = firstNumericString(data, sectionStart, Math.min(sectionEnd, sectionStart + 300))
+    if (num) return num
+  }
+  return ''
+}
+
+// Liest UTF-16LE-Strings ab Laenge 1 im Bereich und gibt die erste reine
+// Zahl (1-4 Ziffern) zurueck.
+function firstNumericString(data, start, end) {
+  let current = []
+  for (let i = start; i < end - 1; i += 2) {
+    const lo = data[i]
+    const hi = data[i + 1]
+    if (hi === 0 && lo >= 0x20 && lo <= 0x7e) {
+      current.push(String.fromCharCode(lo))
+    } else {
+      if (current.length >= 1) {
+        const t = current.join('')
+        if (/^\d{1,4}$/.test(t)) return t
+      }
+      current = []
+    }
+  }
+  if (current.length >= 1) {
+    const t = current.join('')
+    if (/^\d{1,4}$/.test(t)) return t
   }
   return ''
 }
@@ -285,7 +338,7 @@ function parseSimpleMAJ(data, sectionStarts) {
     const articleType = detectArticleType(strings)
     if (!articleType) continue
     const name = findArticleName(strings, articleType)
-    const pos = findPos(strings)
+    const pos = findPos(strings, data, start, end)
 
     // Positionen mit Stern (z.B. 1.08_Z_ZU15*) sind Sonder-/Doppel-Einträge
     // ohne gültigen Mass-Block -> nicht importieren.
