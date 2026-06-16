@@ -126,6 +126,8 @@ export default function Frachtstuecke({
     if (f.typ === 'spiro') return `ø${f.durchmesser} mm × L ${f.L} mm`
     if (f.typ === 'konus' && f.eingangA != null)
       return `Eingang ${f.eingangA}×${f.eingangB} → Ausgang ${f.ausgangA}×${f.ausgangB} · L ${f.L} · Versatz 1: ${f.versatz1} / Versatz 2: ${f.versatz2} mm`
+    if (f.typ === 'bogen')
+      return `${f.eingangA}×${f.eingangB}${f.reduziert ? ` → ${f.ausgangA}×${f.eingangB}` : ''} · ${f.grad}° · R ${f.radius} mm`
     return `${f.a} × ${f.b} × L ${f.L} mm`
   }
 

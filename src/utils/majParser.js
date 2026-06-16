@@ -192,6 +192,16 @@ function detectArticleType(strings) {
     }
   }
   for (const s of strings) {
+    if (s.text.startsWith('Bogen-Red')) {
+      return { type: 'bogen', name: 'Bogen-Red.', reduziert: true }
+    }
+  }
+  for (const s of strings) {
+    if (s.text.startsWith('Bogen')) {
+      return { type: 'bogen', name: 'Bogen', reduziert: false }
+    }
+  }
+  for (const s of strings) {
     if (s.text.startsWith('Kanal-cut')) {
       return { type: 'kanal_cut', name: 'Kanal-cut' }
     }
@@ -398,6 +408,28 @@ function parseSimpleMAJ(data, sectionStarts) {
           versatz2: k.versatz2,
         }
       }
+    } else if (articleType.type === 'bogen') {
+      const bo = findBogenDimensions(data, start, end, articleType.reduziert)
+      if (bo) {
+        const bb = bogenBoundingBox(bo)
+        article = {
+          typ: 'bogen',
+          name: articleType.name,
+          a: bb.a,
+          b: bb.b,
+          L: bb.L,
+          anzahl: menge,
+          eingangA: bo.eingangA,
+          eingangB: bo.eingangB,
+          ausgangA: bo.ausgangA,
+          ausgangB: bo.ausgangB,
+          grad: bo.grad,
+          radius: bo.radius,
+          schenkel1: bo.f1,
+          schenkel2: bo.f2,
+          reduziert: articleType.reduziert,
+        }
+      }
     }
 
     if (article) {
@@ -458,6 +490,113 @@ function findKonusDimensions(data, start, end) {
     }
   }
   return null
+}
+
+// Bogen / Bogen-Red.: der Mass-Block ist eine Folge aufeinanderfolgender
+// 8-Byte-ausgerichteter Ganzzahl-Doubles.
+//   Normaler Bogen:  [A, B, Grad, Schenkel1, Schenkel2, Rundung]
+//   Bogen-Red.:      [AusgangA, B, EingangA, Grad, Schenkel1, Schenkel2, Rundung]
+// Radius = Rundung + Schenkel (wenn Rundung > 0), sonst eckiger Schenkel
+// mit der Rundung aus der Schenkellaenge.
+function findBogenDimensions(data, start, end, reduziert) {
+  let i = start
+  const groups = []
+  while (i < end - 7) {
+    const v = readDouble(data, i)
+    if (v !== 0 && Math.abs(v) <= 10000 && v === Math.floor(v)) {
+      const g = [v]
+      let j = i + 8
+      while (j < end - 7) {
+        const n = readDouble(data, j)
+        if (n >= -10000 && n <= 10000 && n === Math.floor(n)) {
+          g.push(n)
+          j += 8
+          if (g.length >= 12) break
+        } else {
+          break
+        }
+      }
+      if (g.length >= 5) {
+        groups.push(g)
+        i = j
+      } else {
+        i += 2
+      }
+    } else {
+      i += 2
+    }
+  }
+  const isGrad = (x) => x >= 10 && x <= 180
+  for (const g of groups) {
+    if (reduziert) {
+      // [AusgangA, B, EingangA, Grad, S1, S2, Rundung]
+      if (g.length >= 6 && g[0] >= 50 && g[1] >= 50 && g[2] >= 50 && isGrad(g[3])) {
+        const f1 = g[4]
+        const f2 = g[5]
+        const rund = g.length >= 7 ? g[6] : 0
+        return {
+          eingangA: g[2],
+          eingangB: g[1],
+          ausgangA: g[0],
+          ausgangB: g[1],
+          grad: g[3],
+          f1,
+          f2,
+          radius: rund > 0 ? rund + f1 : f1,
+        }
+      }
+    } else {
+      // [A, B, Grad, S1, S2, Rundung]
+      if (g.length >= 5 && g[0] >= 50 && g[1] >= 50 && isGrad(g[2])) {
+        const f1 = g[3]
+        const f2 = g[4]
+        const rund = g.length >= 6 ? g[5] : 0
+        return {
+          eingangA: g[0],
+          eingangB: g[1],
+          ausgangA: g[0],
+          ausgangB: g[1],
+          grad: g[2],
+          f1,
+          f2,
+          radius: rund > 0 ? rund + f1 : f1,
+        }
+      }
+    }
+  }
+  return null
+}
+
+// Numerisches Huellmass des Bogens: Mittellinie (Schenkel + Bogen + Schenkel)
+// abtasten und um den halben Querschnitt erweitern.
+function bogenBoundingBox(bo) {
+  const a = Math.max(bo.eingangA, bo.ausgangA)
+  const b = bo.eingangB
+  const R = bo.radius
+  const theta = (bo.grad * Math.PI) / 180
+  const pts = []
+  pts.push([0, 0])
+  pts.push([bo.f1, 0])
+  const N = 24
+  for (let k = 0; k <= N; k++) {
+    const al = (theta * k) / N
+    pts.push([bo.f1 + R * Math.sin(al), R - R * Math.cos(al)])
+  }
+  const ex = bo.f1 + R * Math.sin(theta)
+  const ez = R - R * Math.cos(theta)
+  pts.push([ex + bo.f2 * Math.cos(theta), ez + bo.f2 * Math.sin(theta)])
+  let minx = Infinity, maxx = -Infinity, minz = Infinity, maxz = -Infinity
+  for (const [x, z] of pts) {
+    if (x < minx) minx = x
+    if (x > maxx) maxx = x
+    if (z < minz) minz = z
+    if (z > maxz) maxz = z
+  }
+  return {
+    L: Math.ceil(maxx - minx + a),
+    a: Math.ceil(maxz - minz + a),
+    b: Math.ceil(b),
+  }
 }
 
 function scanDoubles2ByteAligned(data, start, end) {

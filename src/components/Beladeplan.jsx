@@ -131,6 +131,53 @@ function FrachtKonus({ position, size, eingang, ausgang, versatz1, versatz2, far
   )
 }
 
+function FrachtBogen({ position, size, eingangA, eingangB, ausgangA, grad, radius, schenkel1, schenkel2, farbe, name }) {
+  const geom = useMemo(() => {
+    const a = mmToM(Math.max(eingangA, ausgangA))
+    const b = mmToM(eingangB)
+    const R = mmToM(radius)
+    const f1 = mmToM(schenkel1)
+    const f2 = mmToM(schenkel2)
+    const theta = (grad * Math.PI) / 180
+    // Mittellinie: gerader Schenkel -> Bogen (Radius R) -> gerader Schenkel
+    const pts = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(f1, 0, 0)]
+    const N = 24
+    for (let k = 1; k <= N; k++) {
+      const al = (theta * k) / N
+      pts.push(new THREE.Vector3(f1 + R * Math.sin(al), 0, R - R * Math.cos(al)))
+    }
+    const ex = f1 + R * Math.sin(theta)
+    const ez = R - R * Math.cos(theta)
+    pts.push(new THREE.Vector3(ex + f2 * Math.cos(theta), 0, ez + f2 * Math.sin(theta)))
+    const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0)
+    const shape = new THREE.Shape()
+    shape.moveTo(-a / 2, -b / 2)
+    shape.lineTo(a / 2, -b / 2)
+    shape.lineTo(a / 2, b / 2)
+    shape.lineTo(-a / 2, b / 2)
+    shape.closePath()
+    const g = new THREE.ExtrudeGeometry(shape, { extrudePath: curve, steps: 64, bevelEnabled: false })
+    g.computeBoundingBox()
+    const c = new THREE.Vector3()
+    g.boundingBox.getCenter(c)
+    g.translate(-c.x, -c.y, -c.z)
+    return g
+  }, [eingangA, eingangB, ausgangA, grad, radius, schenkel1, schenkel2])
+  return (
+    <group position={position}>
+      <mesh geometry={geom}>
+        <meshStandardMaterial color={farbe} transparent opacity={0.85} side={2} />
+      </mesh>
+      <mesh geometry={geom}>
+        <meshStandardMaterial color="#000" wireframe transparent opacity={0.2} side={2} />
+      </mesh>
+      <Text position={[0, size[1] / 2 + 0.05, 0]} fontSize={0.1} color="#333" anchorX="center" anchorY="bottom">
+        {name}
+      </Text>
+    </group>
+  )
+}
+
 function SpiroZylinder({ position, radius, laenge, farbe, name, rotation }) {
   return (
     <group position={position} rotation={rotation || [0, 0, 0]}>
@@ -335,7 +382,7 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
           const box = { x, y, z, dx: dimX, dy: dimY, dz: dimZ }
           if (!collides(raum.positionen, box)) {
             const placed = {
-              type: item.typ === 'konus' ? 'konus' : 'box',
+              type: item.typ === 'konus' || item.typ === 'bogen' ? item.typ : 'box',
               position: [x + dimX / 2, y + dimY / 2, z + dimZ / 2],
               size: [dimX, dimY, dimZ],
               farbe: item.farbe,
@@ -348,6 +395,16 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
               placed.ausgang = { a: item.ausgangA, b: item.ausgangB }
               placed.versatz1 = item.versatz1
               placed.versatz2 = item.versatz2
+            }
+            if (item.typ === 'bogen') {
+              placed.eingangA = item.eingangA
+              placed.eingangB = item.eingangB
+              placed.ausgangA = item.ausgangA
+              placed.grad = item.grad
+              placed.radius = item.radius
+              placed.schenkel1 = item.schenkel1
+              placed.schenkel2 = item.schenkel2
+              placed.orientation = orientation
             }
             raum.positionen.push(placed)
             return true
@@ -541,6 +598,24 @@ function Scene({ fahrzeug, raum }) {
               ausgang={p.ausgang}
               versatz1={p.versatz1}
               versatz2={p.versatz2}
+              farbe={p.farbe}
+              name={p.name}
+            />
+          )
+        }
+        if (p.type === 'bogen') {
+          return (
+            <FrachtBogen
+              key={i}
+              position={p.position}
+              size={p.size}
+              eingangA={p.eingangA}
+              eingangB={p.eingangB}
+              ausgangA={p.ausgangA}
+              grad={p.grad}
+              radius={p.radius}
+              schenkel1={p.schenkel1}
+              schenkel2={p.schenkel2}
               farbe={p.farbe}
               name={p.name}
             />
