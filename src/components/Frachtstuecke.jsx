@@ -124,6 +124,8 @@ export default function Frachtstuecke({
 
   const beschreibung = (f) => {
     if (f.typ === 'spiro') return `ø${f.durchmesser} mm × L ${f.L} mm`
+    if (f.typ === 'konus' && f.eingangA != null)
+      return `Eingang ${f.eingangA}×${f.eingangB} → Ausgang ${f.ausgangA}×${f.ausgangB} · L ${f.L} · Versatz ${f.versatz} mm`
     return `${f.a} × ${f.b} × L ${f.L} mm`
   }
 

@@ -187,6 +187,11 @@ function detectArticleType(strings) {
     }
   }
   for (const s of strings) {
+    if (s.text.startsWith('Konus')) {
+      return { type: 'konus', name: 'Konus' }
+    }
+  }
+  for (const s of strings) {
     if (s.text.startsWith('Kanal-cut')) {
       return { type: 'kanal_cut', name: 'Kanal-cut' }
     }
@@ -366,6 +371,25 @@ function parseSimpleMAJ(data, sectionStarts) {
         L = 200
       }
       article = { typ: 'kanal', name: name, a, b, L, anzahl: menge }
+    } else if (articleType.type === 'konus') {
+      const k = findKonusDimensions(data, start, end)
+      if (k) {
+        const a = Math.max(k.eingangA, k.ausgangA)
+        const b = Math.max(k.eingangB, k.ausgangB)
+        article = {
+          typ: 'konus',
+          name: 'Konus',
+          a,
+          b,
+          L: k.L,
+          anzahl: menge,
+          eingangA: k.eingangA,
+          eingangB: k.eingangB,
+          ausgangA: k.ausgangA,
+          ausgangB: k.ausgangB,
+          versatz: k.versatz,
+        }
+      }
     }
 
     if (article) {
@@ -376,6 +400,54 @@ function parseSimpleMAJ(data, sectionStarts) {
   }
 
   return articles
+}
+
+// Konus / Etage: der Mass-Block ist eine Folge aufeinanderfolgender
+// 8-Byte-ausgerichteter Ganzzahl-Doubles:
+//   [EingangA, EingangB, AusgangA, AusgangB, L, Flansch, Flansch, Versatz]
+// Der Versatz darf negativ sein, daher werden in der Fortsetzung auch
+// negative Werte zugelassen.
+function findKonusDimensions(data, start, end) {
+  let i = start
+  const groups = []
+  while (i < end - 7) {
+    const v = readDouble(data, i)
+    if (v !== 0 && Math.abs(v) <= 10000 && v === Math.floor(v)) {
+      const g = [v]
+      let j = i + 8
+      while (j < end - 7) {
+        const n = readDouble(data, j)
+        if (n >= -10000 && n <= 10000 && n === Math.floor(n)) {
+          g.push(n)
+          j += 8
+          if (g.length >= 8) break
+        } else {
+          break
+        }
+      }
+      if (g.length >= 5) {
+        groups.push(g)
+        i = j
+      } else {
+        i += 2
+      }
+    } else {
+      i += 2
+    }
+  }
+  for (const g of groups) {
+    if (g[0] >= 50 && g[1] >= 50 && g[2] >= 50 && g[3] >= 50 && g[4] >= 50) {
+      return {
+        eingangA: g[0],
+        eingangB: g[1],
+        ausgangA: g[2],
+        ausgangB: g[3],
+        L: g[4],
+        versatz: g.length >= 8 ? Math.abs(g[7]) : 0,
+      }
+    }
+  }
+  return null
 }
 
 function scanDoubles2ByteAligned(data, start, end) {

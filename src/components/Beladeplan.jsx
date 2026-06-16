@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from 'react'
+import * as THREE from 'three'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Text, Line } from '@react-three/drei'
 
@@ -70,6 +71,53 @@ function FrachtBox({ position, size, farbe, name }) {
       <mesh>
         <boxGeometry args={size} />
         <meshStandardMaterial color="#000" wireframe transparent opacity={0.15} />
+      </mesh>
+      <Text position={[0, size[1] / 2 + 0.05, 0]} fontSize={0.1} color="#333" anchorX="center" anchorY="bottom">
+        {name}
+      </Text>
+    </group>
+  )
+}
+
+function FrachtKonus({ position, size, eingang, ausgang, versatz, farbe, name }) {
+  const geom = useMemo(() => {
+    const hL = size[0] / 2
+    const za = mmToM(eingang.a) / 2
+    const yb = mmToM(eingang.b) / 2
+    const za2 = mmToM(ausgang.a) / 2
+    const yb2 = mmToM(ausgang.b) / 2
+    const vy = mmToM(versatz)
+    // Eingang (x=-hL) zentriert, Ausgang (x=+hL) um den Versatz in der Höhe verschoben
+    const V = [
+      [-hL, -yb, -za], [-hL, -yb, za], [-hL, yb, za], [-hL, yb, -za],
+      [hL, vy - yb2, -za2], [hL, vy - yb2, za2], [hL, vy + yb2, za2], [hL, vy + yb2, -za2],
+    ]
+    const idx = [
+      0, 1, 2, 0, 2, 3, // Eingang
+      4, 6, 5, 4, 7, 6, // Ausgang
+      0, 4, 5, 0, 5, 1, // unten
+      3, 2, 6, 3, 6, 7, // oben
+      0, 3, 7, 0, 7, 4, // Seite z-
+      1, 5, 6, 1, 6, 2, // Seite z+
+    ]
+    const pos = new Float32Array(idx.length * 3)
+    idx.forEach((vi, k) => {
+      pos[k * 3] = V[vi][0]
+      pos[k * 3 + 1] = V[vi][1]
+      pos[k * 3 + 2] = V[vi][2]
+    })
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    g.computeVertexNormals()
+    return g
+  }, [size, eingang, ausgang, versatz])
+  return (
+    <group position={position}>
+      <mesh geometry={geom}>
+        <meshStandardMaterial color={farbe} transparent opacity={0.85} side={2} />
+      </mesh>
+      <mesh geometry={geom}>
+        <meshStandardMaterial color="#000" wireframe transparent opacity={0.25} side={2} />
       </mesh>
       <Text position={[0, size[1] / 2 + 0.05, 0]} fontSize={0.1} color="#333" anchorX="center" anchorY="bottom">
         {name}
@@ -281,15 +329,21 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
         for (let z = gap; z <= fz.breite - dimZ - gap + 0.001; z += 0.05) {
           const box = { x, y, z, dx: dimX, dy: dimY, dz: dimZ }
           if (!collides(raum.positionen, box)) {
-            raum.positionen.push({
-              type: 'box',
+            const placed = {
+              type: item.typ === 'konus' ? 'konus' : 'box',
               position: [x + dimX / 2, y + dimY / 2, z + dimZ / 2],
               size: [dimX, dimY, dimZ],
               farbe: item.farbe,
               name: item.name,
               orientation,
               box,
-            })
+            }
+            if (item.typ === 'konus') {
+              placed.eingang = { a: item.eingangA, b: item.eingangB }
+              placed.ausgang = { a: item.ausgangA, b: item.ausgangB }
+              placed.versatz = item.versatz
+            }
+            raum.positionen.push(placed)
             return true
           }
         }
@@ -470,6 +524,20 @@ function Scene({ fahrzeug, raum }) {
       {raum.positionen.map((p, i) => {
         if (p.type === 'box') {
           return <FrachtBox key={i} position={p.position} size={p.size} farbe={p.farbe} name={p.name} />
+        }
+        if (p.type === 'konus') {
+          return (
+            <FrachtKonus
+              key={i}
+              position={p.position}
+              size={p.size}
+              eingang={p.eingang}
+              ausgang={p.ausgang}
+              versatz={p.versatz}
+              farbe={p.farbe}
+              name={p.name}
+            />
+          )
         }
         if (p.type === 'spiro' || p.type === 'spiro-nested') {
           return (
