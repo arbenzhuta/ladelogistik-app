@@ -506,7 +506,6 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
     return false
   }
 
-  let currentRaum = createNewRaum()
   const unplaceable = []
 
   const STRATS = [
@@ -526,47 +525,47 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
   if (strat.kanalSort) kanalItems.sort(strat.kanalSort)
   const sonstigeItems = allItems.filter((i) => i.phase === 'sonstige')
 
-  function runSpiro() {
-    for (const item of spiroItems) {
-      if (!tryPlaceSpiro(currentRaum, item.group)) {
-        if (currentRaum.positionen.length > 0) raeume.push(currentRaum)
-        currentRaum = createNewRaum()
-        if (!tryPlaceSpiro(currentRaum, item.group)) unplaceable.push(item.group[0])
-      }
+  // Platziert ein Stück: zuerst in allen bereits offenen Laderäumen (füllt
+  // Lücken, vermeidet halbleere LKW), erst danach ein neuer Laderaum.
+  function placeInAnyRoom(tryFn) {
+    for (const r of raeume) {
+      if (tryFn(r)) return true
     }
+    const nr = createNewRaum()
+    raeume.push(nr)
+    return tryFn(nr)
   }
 
-  function placeKanal(item) {
+  function placeKanal(raum, item) {
     return strat.kanalLiegendFirst
-      ? tryPlaceKanalLiegend(currentRaum, item) || tryPlaceKanalStehend(currentRaum, item)
-      : tryPlaceKanalStehend(currentRaum, item) || tryPlaceKanalLiegend(currentRaum, item)
+      ? tryPlaceKanalLiegend(raum, item) || tryPlaceKanalStehend(raum, item)
+      : tryPlaceKanalStehend(raum, item) || tryPlaceKanalLiegend(raum, item)
+  }
+
+  function runSpiro() {
+    for (const item of spiroItems) {
+      if (!placeInAnyRoom((r) => tryPlaceSpiro(r, item.group))) unplaceable.push(item.group[0])
+    }
   }
 
   function runKanal() {
     for (const item of kanalItems) {
-      if (!placeKanal(item)) {
-        if (currentRaum.positionen.length > 0) raeume.push(currentRaum)
-        currentRaum = createNewRaum()
-        if (!placeKanal(item)) unplaceable.push(item)
-      }
+      if (!placeInAnyRoom((r) => placeKanal(r, item))) unplaceable.push(item)
     }
   }
 
   function runSonstige() {
     for (const item of sonstigeItems) {
-      if (!tryPlaceBox(currentRaum, item)) {
-        if (currentRaum.positionen.length > 0) raeume.push(currentRaum)
-        currentRaum = createNewRaum()
-        if (!tryPlaceBox(currentRaum, item)) unplaceable.push(item)
-      }
+      if (!placeInAnyRoom((r) => tryPlaceBox(r, item))) unplaceable.push(item)
     }
   }
 
   const runners = { spiro: runSpiro, kanal: runKanal, sonstige: runSonstige }
   for (const ph of strat.phaseOrder) runners[ph]()
 
-  if (currentRaum.positionen.length > 0) {
-    raeume.push(currentRaum)
+  // Leere Laderäume entfernen.
+  for (let i = raeume.length - 1; i >= 0; i--) {
+    if (raeume[i].positionen.length === 0) raeume.splice(i, 1)
   }
 
   // Übergrosse Stücke, die in kein Fahrzeug passen, werden trotzdem
