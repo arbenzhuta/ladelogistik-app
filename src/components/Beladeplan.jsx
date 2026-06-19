@@ -507,6 +507,7 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
   }
 
   let currentRaum = createNewRaum()
+  const unplaceable = []
 
   const STRATS = [
     // Standard: Kanäle hochkant, grosse Grundfläche zuerst (Boden füllen, dann stapeln)
@@ -530,7 +531,7 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
       if (!tryPlaceSpiro(currentRaum, item.group)) {
         if (currentRaum.positionen.length > 0) raeume.push(currentRaum)
         currentRaum = createNewRaum()
-        tryPlaceSpiro(currentRaum, item.group)
+        if (!tryPlaceSpiro(currentRaum, item.group)) unplaceable.push(item.group[0])
       }
     }
   }
@@ -546,7 +547,7 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
       if (!placeKanal(item)) {
         if (currentRaum.positionen.length > 0) raeume.push(currentRaum)
         currentRaum = createNewRaum()
-        placeKanal(item)
+        if (!placeKanal(item)) unplaceable.push(item)
       }
     }
   }
@@ -556,7 +557,7 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
       if (!tryPlaceBox(currentRaum, item)) {
         if (currentRaum.positionen.length > 0) raeume.push(currentRaum)
         currentRaum = createNewRaum()
-        tryPlaceBox(currentRaum, item)
+        if (!tryPlaceBox(currentRaum, item)) unplaceable.push(item)
       }
     }
   }
@@ -568,12 +569,51 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
     raeume.push(currentRaum)
   }
 
+  // Übergrosse Stücke, die in kein Fahrzeug passen, werden trotzdem
+  // dargestellt (nebeneinander am Boden), damit nichts unsichtbar verschwindet.
+  if (unplaceable.length > 0) {
+    const ov = createNewRaum()
+    ov.overflow = true
+    let cx = 0.1
+    for (const item of unplaceable) {
+      const dx = mmToM(item.L)
+      const dy = mmToM(item.b)
+      const dz = mmToM(item.a)
+      const placed = {
+        type: item.typ === 'konus' || item.typ === 'bogen' ? item.typ : 'box',
+        position: [cx + dx / 2, dy / 2, dz / 2 + 0.1],
+        size: [dx, dy, dz],
+        farbe: item.farbe,
+        name: item.name,
+        orientation: 'normal',
+      }
+      if (item.typ === 'konus') {
+        placed.eingang = { a: item.eingangA, b: item.eingangB }
+        placed.ausgang = { a: item.ausgangA, b: item.ausgangB }
+        placed.versatz1 = item.versatz1
+        placed.versatz2 = item.versatz2
+      }
+      if (item.typ === 'bogen') {
+        placed.eingangA = item.eingangA
+        placed.eingangB = item.eingangB
+        placed.ausgangA = item.ausgangA
+        placed.grad = item.grad
+        placed.radius = item.radius
+        placed.schenkel1 = item.schenkel1
+        placed.schenkel2 = item.schenkel2
+      }
+      ov.positionen.push(placed)
+      cx += dx + 0.3
+    }
+    raeume.push(ov)
+  }
+
   return raeume
 }
 
 const ANZAHL_VARIANTEN = 4
 
-function Scene({ fahrzeug, raum }) {
+function Scene({ fahrzeug, raum, hideTruck }) {
   if (!raum) return null
 
   return (
@@ -582,7 +622,9 @@ function Scene({ fahrzeug, raum }) {
       <directionalLight position={[10, 15, 10]} intensity={1} />
       <directionalLight position={[-5, 10, -5]} intensity={0.3} />
 
-      <Ladeflaeche laenge={fahrzeug.laenge} breite={fahrzeug.breite} hoehe={fahrzeug.hoehe} />
+      {!hideTruck && (
+        <Ladeflaeche laenge={fahrzeug.laenge} breite={fahrzeug.breite} hoehe={fahrzeug.hoehe} />
+      )}
 
       {raum.positionen.map((p, i) => {
         if (p.type === 'box') {
@@ -715,15 +757,24 @@ export default function Beladeplan({ fahrzeuge, selectedFahrzeug, frachtstuecke 
 
       {raeume.map((raum, idx) => {
         const fzIdx = raumFahrzeuge[idx] !== undefined ? raumFahrzeuge[idx] : selectedFahrzeug
-        const fz = fahrzeuge[fzIdx] || fahrzeuge[0]
+        let fz = fahrzeuge[fzIdx] || fahrzeuge[0]
+        if (raum.overflow) {
+          let maxX = 0, maxZ = 0, maxY = 0
+          for (const p of raum.positionen) {
+            maxX = Math.max(maxX, p.position[0] + p.size[0] / 2)
+            maxZ = Math.max(maxZ, p.position[2] + p.size[2] / 2)
+            maxY = Math.max(maxY, p.position[1] + p.size[1] / 2)
+          }
+          fz = { name: 'Übergross', laenge: maxX + 0.2, breite: maxZ + 0.2, hoehe: maxY + 0.2 }
+        }
         return (
           <div key={idx}>
             <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                <h2 style={{ margin: 0 }}>
-                  Laderaum {idx + 1}{raeume.length > 1 ? ` von ${raeume.length}` : ''}
+                <h2 style={{ margin: 0, color: raum.overflow ? '#c0392b' : undefined }}>
+                  {raum.overflow ? '⚠️ Passt in kein Fahrzeug' : `Laderaum ${idx + 1}${raeume.length > 1 ? ` von ${raeume.length}` : ''}`}
                 </h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} hidden={raum.overflow}>
                   <label style={{ fontSize: '0.85rem', color: '#888', whiteSpace: 'nowrap' }}>Fahrzeug:</label>
                   <select
                     value={fzIdx}
@@ -746,11 +797,16 @@ export default function Beladeplan({ fahrzeuge, selectedFahrzeug, frachtstuecke 
                   </select>
                 </div>
               </div>
-              {raeume.length > 1 && idx > 0 && (
+              {raum.overflow ? (
+                <p style={{ color: '#c0392b', fontWeight: 600, marginBottom: 12, marginTop: 8 }}>
+                  Diese Stücke sind zu gross für das gewählte Fahrzeug und werden hier separat dargestellt:
+                  {' '}{[...new Set(raum.positionen.map((p) => p.name))].join(', ')}
+                </p>
+              ) : (raeume.length > 1 && idx > 0 && (
                 <p style={{ color: '#e67e22', fontWeight: 600, marginBottom: 12, marginTop: 8 }}>
                   Zusätzlicher Laderaum benötigt
                 </p>
-              )}
+              ))}
               <div className="canvas-wrapper">
                 <Canvas
                   camera={{
@@ -759,11 +815,13 @@ export default function Beladeplan({ fahrzeuge, selectedFahrzeug, frachtstuecke 
                   }}
                   style={{ background: '#ffffff' }}
                 >
-                  <Scene fahrzeug={fz} raum={raum} />
+                  <Scene fahrzeug={fz} raum={raum} hideTruck={raum.overflow} />
                 </Canvas>
               </div>
               <div style={{ marginTop: 8, fontSize: '0.85rem', color: '#888' }}>
-                {raum.positionen.length} Stück in diesem Raum — {fz.name} ({fz.laenge} × {fz.breite} × {fz.hoehe} m)
+                {raum.overflow
+                  ? `${raum.positionen.length} übergrosse Stück(e)`
+                  : `${raum.positionen.length} Stück in diesem Raum — ${fz.name} (${fz.laenge} × ${fz.breite} × ${fz.hoehe} m)`}
               </div>
             </div>
           </div>

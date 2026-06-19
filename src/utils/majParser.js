@@ -244,38 +244,45 @@ function findPos(strings, data, sectionStart, sectionEnd) {
     const t = s.text.trim()
     if (/^\d+\.\d+_[A-Za-z0-9]+(_[A-Za-z0-9]+)*\*?$/.test(t)) return t
   }
-  // Reine Zahlen-Position (z.B. "12") steht als kurzer String im Kopf der
-  // Sektion und wird vom normalen String-Leser (min. 3 Zeichen) verworfen.
-  // Daher hier direkt im Kopfbereich nach der ersten reinen Zahl suchen.
+  // Kurze Positionscodes (z.B. "12", "A3", "Z2", "AU-FO") stehen als kurzer
+  // String im Kopf der Sektion und werden vom normalen String-Leser (min. 3
+  // Zeichen) verworfen. Daher hier direkt im Kopfbereich danach suchen.
   if (data) {
-    const num = firstNumericString(data, sectionStart, Math.min(sectionEnd, sectionStart + 300))
-    if (num) return num
+    const p = firstHeaderPos(data, sectionStart, Math.min(sectionEnd, sectionStart + 300))
+    if (p) return p
   }
   return ''
 }
 
-// Liest UTF-16LE-Strings ab Laenge 1 im Bereich und gibt die erste reine
-// Zahl (1-4 Ziffern) zurueck.
-function firstNumericString(data, start, end) {
+// Erkennt einen Positionscode: entweder enthaelt er eine Ziffer (z.B. "12",
+// "A3", "Fo2") oder er ist eine Buchstaben-Bindestrich-Form (z.B. "AU-FO").
+const POS_RE = /^([A-Za-z]{0,4}\d[A-Za-z0-9._-]*|[A-Za-z]{1,4}-[A-Za-z0-9._-]+)\*?$/
+// Typ-/Icon-Namen sind keine Positionen (z.B. "Kanal", "B-Bogen-Red.").
+const TYPE_RE = /kanal|bogen|spiro|konus|schall|kulissen|etage|muffe|rohr|reduz|\.png/i
+
+// Liest UTF-16LE-Strings ab Laenge 1 im Kopfbereich und gibt den ersten
+// positions-aehnlichen Token zurueck (Zahl oder Code wie A3 / AU-FO).
+function firstHeaderPos(data, start, end) {
   let current = []
+  const check = () => {
+    if (current.length >= 1) {
+      const t = current.join('')
+      if (t.length <= 14 && POS_RE.test(t) && !TYPE_RE.test(t)) return t
+    }
+    return null
+  }
   for (let i = start; i < end - 1; i += 2) {
     const lo = data[i]
     const hi = data[i + 1]
     if (hi === 0 && lo >= 0x20 && lo <= 0x7e) {
       current.push(String.fromCharCode(lo))
     } else {
-      if (current.length >= 1) {
-        const t = current.join('')
-        if (/^\d{1,4}$/.test(t)) return t
-      }
+      const hit = check()
+      if (hit) return hit
       current = []
     }
   }
-  if (current.length >= 1) {
-    const t = current.join('')
-    if (/^\d{1,4}$/.test(t)) return t
-  }
-  return ''
+  return check() || ''
 }
 
 function findArticleName(strings, articleType) {
