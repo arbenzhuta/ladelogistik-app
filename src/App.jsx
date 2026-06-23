@@ -4,6 +4,7 @@ import Fahrzeugverwaltung from './components/Fahrzeugverwaltung.jsx'
 import Frachtstuecke from './components/Frachtstuecke.jsx'
 import Beladeplan from './components/Beladeplan.jsx'
 import Routenplanung from './components/Routenplanung.jsx'
+import Transportliste from './components/Transportliste.jsx'
 
 let nextId = 10
 
@@ -55,6 +56,7 @@ export default function App() {
     { id: 'fracht', label: 'Frachtstücke' },
     { id: 'beladeplan', label: '3D-Beladeplan' },
     { id: 'route', label: 'Navigation' },
+    { id: 'transport', label: 'Transportliste' },
   ]
 
   const primaryColor = '#2563eb'
@@ -112,6 +114,9 @@ export default function App() {
         )}
         {activeTab === 'route' && (
           <Routenplanung fahrzeuge={fahrzeuge} />
+        )}
+        {activeTab === 'transport' && (
+          <Transportliste />
         )}
       </main>
     </div>

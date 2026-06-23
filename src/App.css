@@ -825,3 +825,165 @@
     flex-wrap: wrap;
   }
 }
+
+/* Transportliste */
+.tl-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tl-toolbar-left, .tl-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tl-filter-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tl-select {
+  padding: 8px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: #fff;
+  cursor: pointer;
+}
+
+.tl-select:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.tl-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.tl-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #444;
+}
+
+.tl-table-wrap {
+  overflow-x: auto;
+}
+
+.tl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.tl-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 2px solid #e0e0e0;
+  white-space: nowrap;
+}
+
+.tl-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f5;
+  vertical-align: middle;
+}
+
+.tl-row:hover {
+  background: #f8f9fb;
+}
+
+.tl-nowrap {
+  white-space: nowrap;
+}
+
+.tl-objekt {
+  min-width: 220px;
+  color: #333;
+}
+
+.tl-group-row td {
+  padding-top: 18px;
+  padding-bottom: 6px;
+  border-bottom: none;
+}
+
+.tl-group-badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 8px;
+}
+
+.tl-group-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  margin-left: 8px;
+  padding: 0 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #555;
+  background: #eef0f4;
+  border-radius: 11px;
+}
+
+.tl-badge {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.tl-status {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid #cbd2dc;
+  background: #fff;
+  color: #16a34a;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.tl-status:hover {
+  border-color: #16a34a;
+}
+
+.tl-status.done {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+
+.tl-actions {
+  display: flex;
+  gap: 4px;
+}
