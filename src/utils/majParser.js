@@ -108,6 +108,35 @@ function findConsecutiveDimensions(data, start, end) {
   return groups
 }
 
+// Ermittelt Kanal-Masse A×B×L robust. Der Mass-Block enthaelt zuerst die echte
+// Messung [A, B, L] und danach eine Flansch-Gruppe [A, B, A, B] (Querschnitt
+// doppelt). Frueher wurde faelschlich die Flansch-Gruppe als Mass genommen,
+// wodurch L = A wurde (flaches Stueck sah aus wie Wuerfel). Hier wird die
+// Flansch-Gruppe erkannt und L aus der echten Mess-Gruppe gelesen.
+function findKanalABL(dimGroups) {
+  let flange = null
+  for (const g of dimGroups) {
+    if (
+      g.length >= 4 &&
+      g[0].val >= 50 && g[1].val >= 50 &&
+      g[0].val === g[2].val &&
+      g[1].val === g[3].val
+    ) {
+      flange = g
+      break
+    }
+  }
+  if (!flange) return null
+  const A = flange[0].val
+  const B = flange[1].val
+  for (const g of dimGroups) {
+    if (g.length >= 3 && g[0].val === A && g[1].val === B && g[2].val >= 50) {
+      return { a: A, b: B, L: g[2].val }
+    }
+  }
+  return { a: A, b: B, L: A }
+}
+
 function findMenge(data, sectionStart, sectionEnd, articleType) {
   // 876 marker: authoritative for Spiro (any byte alignment, full section)
   function find876() {
@@ -384,7 +413,15 @@ function parseSimpleMAJ(data, sectionStarts) {
         b = 500,
         L = 1850
       let found = false
+      const abl = findKanalABL(dimGroups)
+      if (abl) {
+        a = abl.a
+        b = abl.b
+        L = abl.L
+        found = true
+      }
       for (const group of dimGroups) {
+        if (found) break
         if (
           group.length >= 3 &&
           group[0].val >= 100 &&
