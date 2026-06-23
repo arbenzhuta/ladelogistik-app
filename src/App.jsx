@@ -116,7 +116,7 @@ export default function App() {
           <Routenplanung fahrzeuge={fahrzeuge} />
         )}
         {activeTab === 'transport' && (
-          <Transportliste />
+          <Transportliste frachtstuecke={frachtstuecke} />
         )}
       </main>
     </div>
