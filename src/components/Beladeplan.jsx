@@ -337,6 +337,7 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
       size: [dx, dy, dz],
       farbe: item.farbe,
       name: item.name,
+      pos: item.pos,
       orientation,
       box: best.box,
     })
@@ -387,6 +388,7 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
               size: [dimX, dimY, dimZ],
               farbe: item.farbe,
               name: item.name,
+              pos: item.pos,
               orientation,
               box,
             }
@@ -468,6 +470,7 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
           laenge: dimX,
           farbe: outer.farbe,
           name: outer.name,
+          pos: outer.pos,
           box,
         }]
 
@@ -480,6 +483,7 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
             laenge: mmToM(inner.L),
             farbe: inner.farbe,
             name: inner.name,
+            pos: inner.pos,
           })
         }
 
@@ -584,6 +588,7 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
         size: [dx, dy, dz],
         farbe: item.farbe,
         name: item.name,
+        pos: item.pos,
         orientation: 'normal',
       }
       if (item.typ === 'konus') {
@@ -627,7 +632,7 @@ function Scene({ fahrzeug, raum, hideTruck }) {
 
       {raum.positionen.map((p, i) => {
         if (p.type === 'box') {
-          return <FrachtBox key={i} position={p.position} size={p.size} farbe={p.farbe} name={p.name} />
+          return <FrachtBox key={i} position={p.position} size={p.size} farbe={p.farbe} name={p.pos || p.name} />
         }
         if (p.type === 'konus') {
           return (
@@ -640,7 +645,7 @@ function Scene({ fahrzeug, raum, hideTruck }) {
               versatz1={p.versatz1}
               versatz2={p.versatz2}
               farbe={p.farbe}
-              name={p.name}
+              name={p.pos || p.name}
             />
           )
         }
@@ -658,7 +663,7 @@ function Scene({ fahrzeug, raum, hideTruck }) {
               schenkel1={p.schenkel1}
               schenkel2={p.schenkel2}
               farbe={p.farbe}
-              name={p.name}
+              name={p.pos || p.name}
             />
           )
         }
@@ -670,7 +675,7 @@ function Scene({ fahrzeug, raum, hideTruck }) {
               radius={p.radius}
               laenge={p.laenge}
               farbe={p.farbe}
-              name={p.name}
+              name={p.pos || p.name}
             />
           )
         }
@@ -799,7 +804,7 @@ export default function Beladeplan({ fahrzeuge, selectedFahrzeug, frachtstuecke 
               {raum.overflow ? (
                 <p style={{ color: '#c0392b', fontWeight: 600, marginBottom: 12, marginTop: 8 }}>
                   Diese Stücke sind zu gross für das gewählte Fahrzeug und werden hier separat dargestellt:
-                  {' '}{[...new Set(raum.positionen.map((p) => p.name))].join(', ')}
+                  {' '}{[...new Set(raum.positionen.map((p) => p.pos || p.name))].join(', ')}
                 </p>
               ) : (raeume.length > 1 && idx > 0 && (
                 <p style={{ color: '#e67e22', fontWeight: 600, marginBottom: 12, marginTop: 8 }}>
