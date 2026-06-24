@@ -1035,3 +1035,18 @@
   border-radius: 6px;
   font-size: 0.82rem;
 }
+
+/* Transportliste – Route-Integration */
+.tl-toolbar-route {
+  margin-top: 12px;
+}
+
+.tl-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  position: sticky;
+  left: 0;
+  width: max-content;
+}

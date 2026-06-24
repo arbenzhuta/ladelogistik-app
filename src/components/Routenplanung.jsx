@@ -22,7 +22,7 @@ function todayStr() {
   return d.toISOString().slice(0, 10)
 }
 
-export default function Routenplanung({ fahrzeuge }) {
+export default function Routenplanung({ fahrzeuge, incomingRoute }) {
   const [start, setStart] = useState('')
   const [stops, setStops] = useState([{ address: '', unload_time_min: 30 }])
   const [startDate, setStartDate] = useState(todayStr())
@@ -42,6 +42,21 @@ export default function Routenplanung({ fahrzeuge }) {
   useEffect(() => {
     localStorage.setItem('savedRoutes', JSON.stringify(savedRoutes))
   }, [savedRoutes])
+
+  // Stopps aus der Transportliste übernehmen (Objekt-Adressen der Aufträge).
+  useEffect(() => {
+    if (incomingRoute && incomingRoute.stops && incomingRoute.stops.length) {
+      if (incomingRoute.start) setStart(incomingRoute.start)
+      setStops(
+        incomingRoute.stops.map((s) => ({
+          address: s.address,
+          unload_time_min: s.unload_time_min ?? 30,
+        }))
+      )
+      setResult(null)
+      setError('')
+    }
+  }, [incomingRoute])
 
   // Show map after result changes (wait for DOM)
   useEffect(() => {

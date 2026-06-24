@@ -19,6 +19,13 @@ export default function App() {
   })
   const [selectedFahrzeug, setSelectedFahrzeug] = useState(0)
   const [frachtstuecke, setFrachtstuecke] = useState([])
+  const [incomingRoute, setIncomingRoute] = useState(null)
+
+  const planRoute = (stops) => {
+    if (!stops || !stops.length) return
+    setIncomingRoute({ stops, ts: Date.now() })
+    setActiveTab('route')
+  }
 
   // Save vehicles to localStorage
   useEffect(() => {
@@ -113,10 +120,10 @@ export default function App() {
           />
         )}
         {activeTab === 'route' && (
-          <Routenplanung fahrzeuge={fahrzeuge} />
+          <Routenplanung fahrzeuge={fahrzeuge} incomingRoute={incomingRoute} />
         )}
         {activeTab === 'transport' && (
-          <Transportliste frachtstuecke={frachtstuecke} />
+          <Transportliste frachtstuecke={frachtstuecke} onPlanRoute={planRoute} />
         )}
       </main>
     </div>

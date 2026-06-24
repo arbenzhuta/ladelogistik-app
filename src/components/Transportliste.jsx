@@ -40,6 +40,13 @@ function majNummer(name) {
   return name.replace(/\.maj$/i, '').trim()
 }
 
+// Objekt-Text -> brauchbare Adresse fuer die Routenplanung. Entfernt die
+// angehaengte Auftrags-Nr. ("... / 26103508") fuer besseres Geocoding.
+function cleanAdresse(objekt) {
+  if (!objekt) return ''
+  return objekt.replace(/\s*\/\s*\d+\s*$/, '').trim()
+}
+
 const LEER = {
   liefertermin: '', zeit: '', auftrnr: '', auftrnrKunde: '', kunde: '',
   objekt: '', abladestelle: '', chauffeur: '', fahrzeug: '', anhaenger: false,
@@ -97,7 +104,7 @@ function EditCell({ value, onCommit, type = 'text', options, badge, placeholder 
   )
 }
 
-export default function Transportliste({ frachtstuecke = [] }) {
+export default function Transportliste({ frachtstuecke = [], onPlanRoute }) {
   const [eintraege, setEintraege] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
@@ -159,6 +166,18 @@ export default function Transportliste({ frachtstuecke = [] }) {
     setEintraege((prev) => [...prev, { ...LEER, id: neuerId(), erledigt: false, liefertermin: filterDatum || '' }])
   }
 
+  // Aus Auftraegen eine Route bauen: Objekt-Adressen in Liefer-Reihenfolge.
+  const planeRoute = (rows) => {
+    if (!onPlanRoute) return
+    const sortiert = [...rows].sort((a, b) =>
+      (a.liefertermin + a.zeit).localeCompare(b.liefertermin + b.zeit)
+    )
+    const stops = sortiert
+      .map((r) => ({ address: cleanAdresse(r.objekt), unload_time_min: 30 }))
+      .filter((s) => s.address)
+    if (stops.length) onPlanRoute(stops)
+  }
+
   // Pro importierter MAJ-Datei einen Auftrag erzeugen (Auftr.Nr = Datei-Nr).
   const ausMaj = () => {
     const vorhanden = new Set(eintraege.map((e) => e.auftrnr))
@@ -200,6 +219,11 @@ export default function Transportliste({ frachtstuecke = [] }) {
             <button className="btn btn-primary btn-small" onClick={addEintrag}>+ Auftrag</button>
           </div>
         </div>
+        <div className="tl-toolbar-route">
+          <button className="btn btn-success btn-small" onClick={() => planeRoute(gefiltert)} disabled={!gefiltert.length} title="Alle sichtbaren Aufträge als Route in die Navigation laden">
+            🗺️ Route aus ganzer Liste planen
+          </button>
+        </div>
         <p className="tl-hint">Tipp: Jedes Feld einzeln anklicken zum Bearbeiten. „Auftr.Nr." = MAJ-Datei-Nr.</p>
       </div>
 
@@ -224,6 +248,7 @@ export default function Transportliste({ frachtstuecke = [] }) {
                     onToggle={toggleErledigt}
                     onUpdate={updateFeld}
                     onRemove={removeEintrag}
+                    onPlanRoute={onPlanRoute ? () => planeRoute(rows) : null}
                   />
                 ))}
               </tbody>
@@ -235,15 +260,24 @@ export default function Transportliste({ frachtstuecke = [] }) {
   )
 }
 
-function GruppeBlock({ gruppe, rows, gruppierung, spaltenAnzahl, majNummern, onToggle, onUpdate, onRemove }) {
+function GruppeBlock({ gruppe, rows, gruppierung, spaltenAnzahl, majNummern, onToggle, onUpdate, onRemove, onPlanRoute }) {
   const titel = gruppierung === 'liefertermin' ? formatDatum(gruppe) : gruppe
   return (
     <>
       {gruppierung && (
         <tr className="tl-group-row">
           <td colSpan={spaltenAnzahl}>
-            <span className="tl-group-badge" style={badgeStyle(gruppe)}>{titel}</span>
-            <span className="tl-group-count">{rows.length}</span>
+            <div className="tl-group-head">
+              <div>
+                <span className="tl-group-badge" style={badgeStyle(gruppe)}>{titel}</span>
+                <span className="tl-group-count">{rows.length}</span>
+              </div>
+              {onPlanRoute && (
+                <button className="btn btn-success btn-small" onClick={onPlanRoute} title="Aufträge dieser Gruppe als Route in die Navigation laden">
+                  🗺️ Route planen
+                </button>
+              )}
+            </div>
           </td>
         </tr>
       )}
