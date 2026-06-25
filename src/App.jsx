@@ -20,6 +20,22 @@ export default function App() {
   const [selectedFahrzeug, setSelectedFahrzeug] = useState(0)
   const [frachtstuecke, setFrachtstuecke] = useState([])
   const [incomingRoute, setIncomingRoute] = useState(null)
+  const [majFahrzeug, setMajFahrzeug] = useState(() => {
+    const stored = localStorage.getItem('majFahrzeug')
+    if (stored) {
+      try { return JSON.parse(stored) } catch {}
+    }
+    return {}
+  })
+
+  const setMajFahrzeugFor = (majFile, fzIdx) => {
+    setMajFahrzeug((prev) => {
+      const next = { ...prev }
+      if (fzIdx === '' || fzIdx === null || fzIdx === undefined) delete next[majFile]
+      else next[majFile] = fzIdx
+      return next
+    })
+  }
 
   const planRoute = (stops) => {
     if (!stops || !stops.length) return
@@ -31,6 +47,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('fahrzeuge', JSON.stringify(fahrzeuge))
   }, [fahrzeuge])
+
+  useEffect(() => {
+    localStorage.setItem('majFahrzeug', JSON.stringify(majFahrzeug))
+  }, [majFahrzeug])
 
   const addFrachtstueck = (stueck) => {
     setFrachtstuecke((prev) => [...prev, { ...stueck, id: nextId++ }])
@@ -110,6 +130,9 @@ export default function App() {
             updateFrachtstueck={updateFrachtstueck}
             clearFrachtstuecke={clearFrachtstuecke}
             importFrachtstuecke={importFrachtstuecke}
+            fahrzeuge={fahrzeuge}
+            majFahrzeug={majFahrzeug}
+            setMajFahrzeug={setMajFahrzeugFor}
           />
         )}
         {activeTab === 'beladeplan' && (
@@ -117,6 +140,7 @@ export default function App() {
             fahrzeuge={fahrzeuge}
             selectedFahrzeug={selectedFahrzeug}
             frachtstuecke={frachtstuecke}
+            majFahrzeug={majFahrzeug}
           />
         )}
         {activeTab === 'route' && (

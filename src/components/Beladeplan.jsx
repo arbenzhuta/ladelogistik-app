@@ -615,6 +615,31 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
   return raeume
 }
 
+// Packt die Frachtstücke getrennt pro zugeteiltem Fahrzeug. Stücke ohne
+// Zuteilung laufen über das Standard-Fahrzeug (selectedFahrzeug).
+function berechneBeladungZugeteilt(fahrzeuge, frachtstuecke, majFahrzeug, selectedFahrzeug, variante) {
+  const buckets = new Map()
+  for (const f of frachtstuecke) {
+    const vIdx = (f.majFile && majFahrzeug[f.majFile] !== undefined)
+      ? majFahrzeug[f.majFile]
+      : selectedFahrzeug
+    if (!buckets.has(vIdx)) buckets.set(vIdx, [])
+    buckets.get(vIdx).push(f)
+  }
+  const alle = []
+  const sortedKeys = [...buckets.keys()].sort((a, b) => a - b)
+  for (const vIdx of sortedKeys) {
+    const fz = fahrzeuge[vIdx] || fahrzeuge[0]
+    const liste = new Array(10).fill(fz)
+    const raeume = berechneBeladung(liste, buckets.get(vIdx), variante)
+    for (const r of raeume) {
+      r.zugewiesenFahrzeug = vIdx
+      alle.push(r)
+    }
+  }
+  return alle
+}
+
 const ANZAHL_VARIANTEN = 4
 
 function Scene({ fahrzeug, raum, hideTruck }) {
@@ -693,9 +718,14 @@ function Scene({ fahrzeug, raum, hideTruck }) {
   )
 }
 
-export default function Beladeplan({ fahrzeuge, selectedFahrzeug, frachtstuecke }) {
+export default function Beladeplan({ fahrzeuge, selectedFahrzeug, frachtstuecke, majFahrzeug = {} }) {
   const [raumFahrzeuge, setRaumFahrzeuge] = useState({})
   const [variante, setVariante] = useState(0)
+
+  const hatZuteilung = useMemo(
+    () => frachtstuecke.some((f) => f.majFile && majFahrzeug[f.majFile] !== undefined),
+    [frachtstuecke, majFahrzeug]
+  )
 
   const fahrzeugListe = useMemo(() => {
     const maxRaeume = 10
@@ -708,8 +738,10 @@ export default function Beladeplan({ fahrzeuge, selectedFahrzeug, frachtstuecke 
   }, [fahrzeuge, selectedFahrzeug, raumFahrzeuge])
 
   const raeume = useMemo(
-    () => berechneBeladung(fahrzeugListe, frachtstuecke, variante),
-    [fahrzeugListe, frachtstuecke, variante]
+    () => hatZuteilung
+      ? berechneBeladungZugeteilt(fahrzeuge, frachtstuecke, majFahrzeug, selectedFahrzeug, variante)
+      : berechneBeladung(fahrzeugListe, frachtstuecke, variante),
+    [hatZuteilung, fahrzeuge, fahrzeugListe, frachtstuecke, majFahrzeug, selectedFahrzeug, variante]
   )
 
   const handleFahrzeugChange = useCallback((raumIdx, fzIdx) => {
@@ -760,7 +792,9 @@ export default function Beladeplan({ fahrzeuge, selectedFahrzeug, frachtstuecke 
       )}
 
       {raeume.map((raum, idx) => {
-        const fzIdx = raumFahrzeuge[idx] !== undefined ? raumFahrzeuge[idx] : selectedFahrzeug
+        const fzIdx = hatZuteilung
+          ? (raum.zugewiesenFahrzeug ?? selectedFahrzeug)
+          : (raumFahrzeuge[idx] !== undefined ? raumFahrzeuge[idx] : selectedFahrzeug)
         let fz = fahrzeuge[fzIdx] || fahrzeuge[0]
         if (raum.overflow) {
           let maxX = 0, maxZ = 0, maxY = 0
@@ -780,25 +814,38 @@ export default function Beladeplan({ fahrzeuge, selectedFahrzeug, frachtstuecke 
                 </h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} hidden={raum.overflow}>
                   <label style={{ fontSize: '0.85rem', color: '#888', whiteSpace: 'nowrap' }}>Fahrzeug:</label>
-                  <select
-                    value={fzIdx}
-                    onChange={(e) => handleFahrzeugChange(idx, parseInt(e.target.value))}
-                    style={{
+                  {hatZuteilung ? (
+                    <span style={{
                       padding: '6px 10px',
                       borderRadius: 6,
-                      border: '1px solid #444',
-                      background: '#2a2a2a',
-                      color: '#fff',
+                      background: '#e8f0fe',
+                      color: '#1a56db',
                       fontSize: '0.9rem',
-                      minWidth: 140,
-                    }}
-                  >
-                    {fahrzeuge.map((f, fi) => (
-                      <option key={fi} value={fi}>
-                        {f.name} ({f.laenge}×{f.breite}×{f.hoehe}m)
-                      </option>
-                    ))}
-                  </select>
+                      fontWeight: 600,
+                    }}>
+                      {fz.name} ({fz.laenge}×{fz.breite}×{fz.hoehe}m) · zugeteilt
+                    </span>
+                  ) : (
+                    <select
+                      value={fzIdx}
+                      onChange={(e) => handleFahrzeugChange(idx, parseInt(e.target.value))}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: 6,
+                        border: '1px solid #444',
+                        background: '#2a2a2a',
+                        color: '#fff',
+                        fontSize: '0.9rem',
+                        minWidth: 140,
+                      }}
+                    >
+                      {fahrzeuge.map((f, fi) => (
+                        <option key={fi} value={fi}>
+                          {f.name} ({f.laenge}×{f.breite}×{f.hoehe}m)
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
               {raum.overflow ? (

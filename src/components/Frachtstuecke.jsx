@@ -19,6 +19,9 @@ export default function Frachtstuecke({
   updateFrachtstueck,
   clearFrachtstuecke,
   importFrachtstuecke,
+  fahrzeuge = [],
+  majFahrzeug = {},
+  setMajFahrzeug,
 }) {
   const [formTyp, setFormTyp] = useState('kanal')
   const [form, setForm] = useState({ ...DEFAULT_KANAL })
@@ -348,7 +351,34 @@ export default function Frachtstuecke({
                       alignItems: 'center',
                     }}>
                       <span>{entry.label}</span>
-                      <span style={{ fontWeight: 500, color: '#555' }}>{groupCount} Stück</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {entry.key !== '__manuell__' && setMajFahrzeug && fahrzeuge.length > 0 && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: '#1a56db' }}>
+                            <span role="img" aria-label="Fahrzeug">🚚</span>
+                            <select
+                              value={majFahrzeug[entry.key] ?? ''}
+                              onChange={(e) => setMajFahrzeug(entry.key, e.target.value === '' ? '' : parseInt(e.target.value))}
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                                border: '1px solid #b6c8f0',
+                                background: '#fff',
+                                color: '#1a56db',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                              }}
+                            >
+                              <option value="">Fahrzeug wählen…</option>
+                              {fahrzeuge.map((f, fi) => (
+                                <option key={fi} value={fi}>
+                                  {f.name} ({f.laenge}×{f.breite}×{f.hoehe}m)
+                                </option>
+                              ))}
+                            </select>
+                          </span>
+                        )}
+                        <span style={{ fontWeight: 500, color: '#555' }}>{groupCount} Stück</span>
+                      </div>
                     </div>
                   )
                 }
