@@ -351,30 +351,39 @@ export default function Frachtstuecke({
                       alignItems: 'center',
                     }}>
                       <span>{entry.label}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         {entry.key !== '__manuell__' && setMajFahrzeug && fahrzeuge.length > 0 && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: '#1a56db' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: '#1a56db', flexWrap: 'wrap' }}>
                             <span role="img" aria-label="Fahrzeug">🚚</span>
-                            <select
-                              value={majFahrzeug[entry.key] ?? ''}
-                              onChange={(e) => setMajFahrzeug(entry.key, e.target.value === '' ? '' : parseInt(e.target.value))}
-                              style={{
-                                padding: '3px 8px',
-                                borderRadius: 6,
-                                border: '1px solid #b6c8f0',
-                                background: '#fff',
-                                color: '#1a56db',
-                                fontSize: '0.8rem',
-                                fontWeight: 600,
-                              }}
-                            >
-                              <option value="">Fahrzeug wählen…</option>
-                              {fahrzeuge.map((f, fi) => (
-                                <option key={fi} value={fi}>
-                                  {f.name} ({f.laenge}×{f.breite}×{f.hoehe}m)
-                                </option>
-                              ))}
-                            </select>
+                            {(() => {
+                              const sel = Array.isArray(majFahrzeug[entry.key]) ? majFahrzeug[entry.key] : []
+                              return fahrzeuge.map((f, fi) => {
+                                const aktiv = sel.includes(fi)
+                                return (
+                                  <button
+                                    key={fi}
+                                    type="button"
+                                    onClick={() => setMajFahrzeug(entry.key, fi)}
+                                    title={aktiv ? 'Zuteilung entfernen' : 'Diesem Fahrzeug zuteilen'}
+                                    style={{
+                                      padding: '3px 10px',
+                                      borderRadius: 999,
+                                      border: aktiv ? '1px solid #1a56db' : '1px solid #b6c8f0',
+                                      background: aktiv ? '#1a56db' : '#fff',
+                                      color: aktiv ? '#fff' : '#1a56db',
+                                      fontSize: '0.78rem',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    {aktiv ? '✓ ' : ''}{f.name} ({f.laenge}×{f.breite}×{f.hoehe}m)
+                                  </button>
+                                )
+                              })
+                            })()}
+                            {(!Array.isArray(majFahrzeug[entry.key]) || majFahrzeug[entry.key].length === 0) && (
+                              <span style={{ color: '#7a8aa8', fontWeight: 500, fontSize: '0.78rem' }}>Fahrzeug(e) wählen…</span>
+                            )}
                           </span>
                         )}
                         <span style={{ fontWeight: 500, color: '#555' }}>{groupCount} Stück</span>

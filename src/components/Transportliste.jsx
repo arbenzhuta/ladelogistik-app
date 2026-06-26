@@ -166,16 +166,40 @@ export default function Transportliste({ frachtstuecke = [], onPlanRoute }) {
     setEintraege((prev) => [...prev, { ...LEER, id: neuerId(), erledigt: false, liefertermin: filterDatum || '' }])
   }
 
-  // Aus Auftraegen eine Route bauen: Objekt-Adressen in Liefer-Reihenfolge.
-  const planeRoute = (rows) => {
-    if (!onPlanRoute) return
+  // Aus Auftraegen die Stopps bauen: Objekt-Adressen in Liefer-Reihenfolge.
+  const rowsZuStops = (rows) => {
     const sortiert = [...rows].sort((a, b) =>
       (a.liefertermin + a.zeit).localeCompare(b.liefertermin + b.zeit)
     )
-    const stops = sortiert
+    return sortiert
       .map((r) => ({ address: cleanAdresse(r.objekt), unload_time_min: 30 }))
       .filter((s) => s.address)
-    if (stops.length) onPlanRoute(stops)
+  }
+
+  // Eine gemeinsame Route aus den Auftraegen.
+  const planeRoute = (rows, name = '') => {
+    if (!onPlanRoute) return
+    const stops = rowsZuStops(rows)
+    if (stops.length) onPlanRoute([{ name, stops }])
+  }
+
+  // Pro Fahrzeug eine eigene Route: Auftraege nach Fahrzeug gruppieren.
+  const planeRoutenProFahrzeug = (rows) => {
+    if (!onPlanRoute) return
+    const map = new Map()
+    for (const r of rows) {
+      const key = r.fahrzeug || '— ohne Fahrzeug —'
+      if (!map.has(key)) map.set(key, [])
+      map.get(key).push(r)
+    }
+    const plans = [...map.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([name, gruppe]) => ({
+        name: name + (gruppe.some((g) => g.anhaenger) ? ' + Anhänger' : ''),
+        stops: rowsZuStops(gruppe),
+      }))
+      .filter((p) => p.stops.length)
+    if (plans.length) onPlanRoute(plans)
   }
 
   // Pro importierter MAJ-Datei einen Auftrag erzeugen (Auftr.Nr = Datei-Nr).
@@ -220,8 +244,11 @@ export default function Transportliste({ frachtstuecke = [], onPlanRoute }) {
           </div>
         </div>
         <div className="tl-toolbar-route">
-          <button className="btn btn-success btn-small" onClick={() => planeRoute(gefiltert)} disabled={!gefiltert.length} title="Alle sichtbaren Aufträge als Route in die Navigation laden">
+          <button className="btn btn-success btn-small" onClick={() => planeRoute(gefiltert)} disabled={!gefiltert.length} title="Alle sichtbaren Aufträge als gemeinsame Route in die Navigation laden">
             🗺️ Route aus ganzer Liste planen
+          </button>
+          <button className="btn btn-primary btn-small" onClick={() => planeRoutenProFahrzeug(gefiltert)} disabled={!gefiltert.length} title="Pro Fahrzeug eine eigene Route in die Navigation laden">
+            🚚 Route pro Fahrzeug planen
           </button>
         </div>
         <p className="tl-hint">Tipp: Jedes Feld einzeln anklicken zum Bearbeiten. „Auftr.Nr." = MAJ-Datei-Nr.</p>

@@ -23,23 +23,39 @@ export default function App() {
   const [majFahrzeug, setMajFahrzeug] = useState(() => {
     const stored = localStorage.getItem('majFahrzeug')
     if (stored) {
-      try { return JSON.parse(stored) } catch {}
+      try {
+        const parsed = JSON.parse(stored)
+        // Migration: frueher war pro Datei nur 1 Index gespeichert -> Array.
+        const norm = {}
+        for (const k of Object.keys(parsed)) {
+          const v = parsed[k]
+          if (Array.isArray(v)) norm[k] = v
+          else if (v !== null && v !== undefined && v !== '') norm[k] = [v]
+        }
+        return norm
+      } catch { /* ignore */ }
     }
     return {}
   })
 
+  // Schaltet ein Fahrzeug fuer eine MAJ-Datei an/aus (Mehrfachauswahl).
   const setMajFahrzeugFor = (majFile, fzIdx) => {
     setMajFahrzeug((prev) => {
+      const cur = Array.isArray(prev[majFile]) ? prev[majFile] : []
+      const has = cur.includes(fzIdx)
+      const nextArr = has ? cur.filter((i) => i !== fzIdx) : [...cur, fzIdx].sort((a, b) => a - b)
       const next = { ...prev }
-      if (fzIdx === '' || fzIdx === null || fzIdx === undefined) delete next[majFile]
-      else next[majFile] = fzIdx
+      if (nextArr.length === 0) delete next[majFile]
+      else next[majFile] = nextArr
       return next
     })
   }
 
-  const planRoute = (stops) => {
-    if (!stops || !stops.length) return
-    setIncomingRoute({ stops, ts: Date.now() })
+  // Nimmt eine Liste von Routen entgegen ({ name, start?, stops }) und laedt sie
+  // in die Routenplanung. Eine Route pro Fahrzeug ist so moeglich.
+  const planRoute = (plans) => {
+    if (!plans || !plans.length) return
+    setIncomingRoute({ plans, ts: Date.now() })
     setActiveTab('route')
   }
 

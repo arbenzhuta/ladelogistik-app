@@ -22,43 +22,141 @@ function todayStr() {
   return d.toISOString().slice(0, 10)
 }
 
+let planSeq = 1
+function leererPlan(extra = {}) {
+  return {
+    id: planSeq++,
+    name: '',
+    start: '',
+    startDate: todayStr(),
+    startTime: '07:00',
+    stops: [{ address: '', unload_time_min: 30 }],
+    ...extra,
+  }
+}
+
+function formatTime(min) {
+  const h = Math.floor(min / 60)
+  const m = Math.round(min % 60)
+  return h > 0 ? `${h} Std ${m} Min` : `${m} Min`
+}
+
+function formatClock(date) {
+  if (!date) return ''
+  const d = new Date(date)
+  return d.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatDateTime(date) {
+  if (!date) return ''
+  const d = new Date(date)
+  return d.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + formatClock(d)
+}
+
 export default function Routenplanung({ fahrzeuge, incomingRoute }) {
-  const [start, setStart] = useState('')
-  const [stops, setStops] = useState([{ address: '', unload_time_min: 30 }])
-  const [startDate, setStartDate] = useState(todayStr())
-  const [startTime, setStartTime] = useState('07:00')
-  const [result, setResult] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [plans, setPlans] = useState([leererPlan()])
   const [savedRoutes, setSavedRoutes] = useState(() => {
     const stored = localStorage.getItem('savedRoutes')
-    if (stored) { try { return JSON.parse(stored) } catch {} }
+    if (stored) { try { return JSON.parse(stored) } catch { /* ignore */ } }
     return []
   })
-  const [routeName, setRouteName] = useState('')
-  const mapRef = useRef(null)
-  const mapInstanceRef = useRef(null)
 
   useEffect(() => {
     localStorage.setItem('savedRoutes', JSON.stringify(savedRoutes))
   }, [savedRoutes])
 
-  // Stopps aus der Transportliste übernehmen (Objekt-Adressen der Aufträge).
+  // Routen aus der Transportliste übernehmen (eine pro Fahrzeug möglich).
   useEffect(() => {
-    if (incomingRoute && incomingRoute.stops && incomingRoute.stops.length) {
-      if (incomingRoute.start) setStart(incomingRoute.start)
-      setStops(
-        incomingRoute.stops.map((s) => ({
-          address: s.address,
-          unload_time_min: s.unload_time_min ?? 30,
-        }))
+    if (!incomingRoute || !incomingRoute.plans || !incomingRoute.plans.length) return
+    setPlans(
+      incomingRoute.plans.map((p) =>
+        leererPlan({
+          name: p.name || '',
+          start: p.start || '',
+          stops: (p.stops && p.stops.length)
+            ? p.stops.map((s) => ({ address: s.address, unload_time_min: s.unload_time_min ?? 30 }))
+            : [{ address: '', unload_time_min: 30 }],
+        })
       )
-      setResult(null)
-      setError('')
-    }
+    )
   }, [incomingRoute])
 
-  // Show map after result changes (wait for DOM)
+  const updatePlan = (id, changes) => {
+    setPlans((prev) => prev.map((p) => (p.id === id ? { ...p, ...changes } : p)))
+  }
+
+  const addPlan = () => setPlans((prev) => [...prev, leererPlan()])
+
+  const removePlan = (id) => {
+    setPlans((prev) => (prev.length <= 1 ? prev : prev.filter((p) => p.id !== id)))
+  }
+
+  const addSavedRoute = (routeObj) => {
+    setSavedRoutes((prev) => [...prev, routeObj])
+  }
+
+  const deleteRoute = (rid) => {
+    setSavedRoutes((prev) => prev.filter((r) => r.id !== rid))
+  }
+
+  return (
+    <div>
+      <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <h2 style={{ margin: 0 }}>Routenplanung</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: '0.85rem', color: '#888' }}>
+            {plans.length} {plans.length === 1 ? 'Route' : 'Routen'} (je Fahrzeug)
+          </span>
+          <button className="btn btn-primary btn-small" onClick={addPlan}>+ Route hinzufügen</button>
+        </div>
+      </div>
+
+      {plans.map((plan, i) => (
+        <RoutePlanCard
+          key={plan.id}
+          plan={plan}
+          index={i}
+          canRemove={plans.length > 1}
+          fahrzeuge={fahrzeuge}
+          onChange={(changes) => updatePlan(plan.id, changes)}
+          onRemove={() => removePlan(plan.id)}
+          onSave={addSavedRoute}
+        />
+      ))}
+
+      {savedRoutes.length > 0 && (
+        <div className="card">
+          <h2>Gespeicherte Routen</h2>
+          <div className="saved-routes">
+            {savedRoutes.map((r) => (
+              <div key={r.id} className="saved-route-item">
+                <div className="saved-route-info">
+                  <strong>{r.name}</strong>
+                  <span style={{ fontSize: '0.85rem', color: '#888' }}>
+                    {r.total_distance_km ? `${r.total_distance_km} km` : ''}
+                    {r.total_duration_min ? ` · ${formatTime(r.total_duration_min)}` : ''}
+                  </span>
+                </div>
+                <button className="btn btn-danger btn-small" onClick={() => deleteRoute(r.id)}>
+                  Löschen
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RoutePlanCard({ plan, index, canRemove, onChange, onRemove, onSave }) {
+  const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [routeName, setRouteName] = useState('')
+  const mapRef = useRef(null)
+  const mapInstanceRef = useRef(null)
+
   useEffect(() => {
     if (result) {
       const timer = setTimeout(() => showMap(result), 100)
@@ -66,23 +164,20 @@ export default function Routenplanung({ fahrzeuge, incomingRoute }) {
     }
   }, [result])
 
-  const addStop = () => {
-    setStops([...stops, { address: '', unload_time_min: 30 }])
+  const addStop = () => onChange({ stops: [...plan.stops, { address: '', unload_time_min: 30 }] })
+
+  const removeStop = (idx) => {
+    if (plan.stops.length <= 1) return
+    onChange({ stops: plan.stops.filter((_, i) => i !== idx) })
   }
 
-  const removeStop = (index) => {
-    if (stops.length <= 1) return
-    setStops(stops.filter((_, i) => i !== index))
-  }
-
-  const updateStop = (index, field, value) => {
-    const updated = [...stops]
-    updated[index] = { ...updated[index], [field]: value }
-    setStops(updated)
+  const updateStop = (idx, field, value) => {
+    const updated = plan.stops.map((s, i) => (i === idx ? { ...s, [field]: value } : s))
+    onChange({ stops: updated })
   }
 
   const calculateRoute = async () => {
-    if (!start || stops.some((s) => !s.address)) {
+    if (!plan.start || plan.stops.some((s) => !s.address)) {
       setError('Bitte alle Adressen eingeben')
       return
     }
@@ -90,7 +185,7 @@ export default function Routenplanung({ fahrzeuge, incomingRoute }) {
     setLoading(true)
     setResult(null)
     try {
-      const allAddresses = [start, ...stops.map((s) => s.address)]
+      const allAddresses = [plan.start, ...plan.stops.map((s) => s.address)]
       const geocoded = []
       for (const addr of allAddresses) {
         geocoded.push(await geocode(addr))
@@ -98,9 +193,8 @@ export default function Routenplanung({ fahrzeuge, incomingRoute }) {
 
       const route = await getRoute(geocoded)
 
-      // Build departure time
-      const [hh, mm] = startTime.split(':').map(Number)
-      const departureDate = new Date(startDate)
+      const [hh, mm] = plan.startTime.split(':').map(Number)
+      const departureDate = new Date(plan.startDate)
       departureDate.setHours(hh, mm, 0, 0)
 
       let currentTime = new Date(departureDate)
@@ -110,7 +204,7 @@ export default function Routenplanung({ fahrzeuge, incomingRoute }) {
         const driveMins = leg.duration / 60
         currentTime = new Date(currentTime.getTime() + driveMins * 60000)
         const arriveAt = new Date(currentTime)
-        const unloadMin = i < stops.length ? (stops[i].unload_time_min || 0) : 0
+        const unloadMin = i < plan.stops.length ? (plan.stops[i].unload_time_min || 0) : 0
         currentTime = new Date(currentTime.getTime() + unloadMin * 60000)
         const departAfterUnload = new Date(currentTime)
 
@@ -128,9 +222,9 @@ export default function Routenplanung({ fahrzeuge, incomingRoute }) {
 
       const total_distance_km = Math.round(route.distance / 100) / 10
       const total_duration_min = Math.round(route.duration / 60 * 10) / 10
-      const total_unload_min = stops.reduce((s, st) => s + (st.unload_time_min || 0), 0)
+      const total_unload_min = plan.stops.reduce((s, st) => s + (st.unload_time_min || 0), 0)
 
-      const data = {
+      setResult({
         geocoded,
         legs,
         total_distance_km,
@@ -140,8 +234,7 @@ export default function Routenplanung({ fahrzeuge, incomingRoute }) {
         geometry: route.geometry,
         departure: departureDate,
         arrival: currentTime,
-      }
-      setResult(data)
+      })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -184,44 +277,38 @@ export default function Routenplanung({ fahrzeuge, incomingRoute }) {
   }
 
   const saveRoute = () => {
-    if (!result || !routeName) return
-    const newRoute = {
+    const name = routeName || plan.name
+    if (!result || !name) return
+    onSave({
       id: Date.now(),
-      name: routeName,
+      name,
       total_distance_km: result.total_distance_km,
       total_duration_min: result.total_duration_min,
       total_unload_min: result.total_unload_min,
-    }
-    setSavedRoutes([...savedRoutes, newRoute])
+    })
     setRouteName('')
   }
 
-  const deleteRoute = (id) => {
-    setSavedRoutes(savedRoutes.filter((r) => r.id !== id))
-  }
-
-  const formatTime = (min) => {
-    const h = Math.floor(min / 60)
-    const m = Math.round(min % 60)
-    return h > 0 ? `${h} Std ${m} Min` : `${m} Min`
-  }
-
-  const formatClock = (date) => {
-    if (!date) return ''
-    const d = new Date(date)
-    return d.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })
-  }
-
-  const formatDateTime = (date) => {
-    if (!date) return ''
-    const d = new Date(date)
-    return d.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + formatClock(d)
-  }
+  const titel = plan.name || `Route ${index + 1}`
 
   return (
-    <div>
+    <>
       <div className="card">
-        <h2>Routenplanung</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+            <span role="img" aria-label="Fahrzeug" style={{ fontSize: '1.2rem' }}>🚚</span>
+            <input
+              type="text"
+              value={plan.name}
+              onChange={(e) => onChange({ name: e.target.value })}
+              placeholder={`Fahrzeug / Route ${index + 1}`}
+              style={{ flex: 1, maxWidth: 320, padding: '8px 12px', border: '2px solid #e0e0e0', borderRadius: 8, fontSize: '1rem', fontWeight: 600 }}
+            />
+          </div>
+          {canRemove && (
+            <button className="btn btn-danger btn-small" onClick={onRemove} title="Diese Route entfernen">✕ Route</button>
+          )}
+        </div>
 
         <div className="route-form">
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -229,8 +316,8 @@ export default function Routenplanung({ fahrzeuge, incomingRoute }) {
               <label>Startort</label>
               <input
                 type="text"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
+                value={plan.start}
+                onChange={(e) => onChange({ start: e.target.value })}
                 placeholder="z.B. Trimmis"
               />
             </div>
@@ -238,16 +325,16 @@ export default function Routenplanung({ fahrzeuge, incomingRoute }) {
               <label>Datum</label>
               <input
                 type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                value={plan.startDate}
+                onChange={(e) => onChange({ startDate: e.target.value })}
               />
             </div>
             <div className="form-group" style={{ minWidth: 100 }}>
               <label>Startzeit</label>
               <input
                 type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                value={plan.startTime}
+                onChange={(e) => onChange({ startTime: e.target.value })}
               />
             </div>
           </div>
@@ -256,7 +343,7 @@ export default function Routenplanung({ fahrzeuge, incomingRoute }) {
             <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8, display: 'block' }}>
               Ziele / Stopps
             </label>
-            {stops.map((stop, i) => (
+            {plan.stops.map((stop, i) => (
               <div key={i} className="stop-row">
                 <span className="stop-number">{i + 1}.</span>
                 <input
@@ -278,7 +365,7 @@ export default function Routenplanung({ fahrzeuge, incomingRoute }) {
                   />
                   <span>Min</span>
                 </div>
-                {stops.length > 1 && (
+                {plan.stops.length > 1 && (
                   <button className="btn btn-danger btn-small" onClick={() => removeStop(i)}>x</button>
                 )}
               </div>
@@ -304,7 +391,7 @@ export default function Routenplanung({ fahrzeuge, incomingRoute }) {
       {result && (
         <>
           <div className="card">
-            <h2>Routendetails</h2>
+            <h2>Routendetails – {titel}</h2>
             <div className="route-summary">
               <div className="info-badge">
                 <span className="label">Abfahrt</span>
@@ -364,43 +451,21 @@ export default function Routenplanung({ fahrzeuge, incomingRoute }) {
                 type="text"
                 value={routeName}
                 onChange={(e) => setRouteName(e.target.value)}
-                placeholder="Name für Route..."
+                placeholder={plan.name ? `Name (Standard: ${plan.name})` : 'Name für Route...'}
                 style={{ flex: 1, padding: '10px 12px', border: '2px solid #e0e0e0', borderRadius: 8, fontSize: '0.95rem' }}
               />
-              <button className="btn btn-primary" onClick={saveRoute} disabled={!routeName}>
+              <button className="btn btn-primary" onClick={saveRoute} disabled={!routeName && !plan.name}>
                 Route speichern
               </button>
             </div>
           </div>
 
           <div className="card">
-            <h2>Karte</h2>
+            <h2>Karte – {titel}</h2>
             <div ref={mapRef} style={{ height: 400, borderRadius: 12, overflow: 'hidden' }} />
           </div>
         </>
       )}
-
-      {savedRoutes.length > 0 && (
-        <div className="card">
-          <h2>Gespeicherte Routen</h2>
-          <div className="saved-routes">
-            {savedRoutes.map((r) => (
-              <div key={r.id} className="saved-route-item">
-                <div className="saved-route-info">
-                  <strong>{r.name}</strong>
-                  <span style={{ fontSize: '0.85rem', color: '#888' }}>
-                    {r.total_distance_km ? `${r.total_distance_km} km` : ''} 
-                    {r.total_duration_min ? ` · ${formatTime(r.total_duration_min)}` : ''}
-                  </span>
-                </div>
-                <button className="btn btn-danger btn-small" onClick={() => deleteRoute(r.id)}>
-                  Löschen
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   )
 }

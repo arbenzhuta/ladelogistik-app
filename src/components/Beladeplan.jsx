@@ -615,25 +615,37 @@ function berechneBeladung(fahrzeugListe, frachtstuecke, variante = 0) {
   return raeume
 }
 
-// Packt die Frachtstücke getrennt pro zugeteiltem Fahrzeug. Stücke ohne
-// Zuteilung laufen über das Standard-Fahrzeug (selectedFahrzeug).
+// Liefert die zugeteilten Fahrzeug-Indizes einer MAJ-Datei als Array (oder null).
+function zugeteilteFahrzeuge(majFile, majFahrzeug) {
+  if (!majFile) return null
+  const v = majFahrzeug[majFile]
+  if (Array.isArray(v) && v.length) return v
+  if (v !== undefined && v !== null && v !== '') return [v]
+  return null
+}
+
+// Packt die Frachtstücke getrennt pro MAJ-Datei auf deren zugeteilte Fahrzeuge.
+// Sind mehrere Fahrzeuge zugeteilt, verteilt sich die Ladung auf alle (ein
+// Laderaum pro Fahrzeug, Überlauf auf das letzte). Stücke ohne Zuteilung
+// laufen gesammelt über das Standard-Fahrzeug (selectedFahrzeug).
 function berechneBeladungZugeteilt(fahrzeuge, frachtstuecke, majFahrzeug, selectedFahrzeug, variante) {
   const buckets = new Map()
   for (const f of frachtstuecke) {
-    const vIdx = (f.majFile && majFahrzeug[f.majFile] !== undefined)
-      ? majFahrzeug[f.majFile]
-      : selectedFahrzeug
-    if (!buckets.has(vIdx)) buckets.set(vIdx, [])
-    buckets.get(vIdx).push(f)
+    const zug = zugeteilteFahrzeuge(f.majFile, majFahrzeug)
+    const key = zug ? f.majFile : '__default__'
+    if (!buckets.has(key)) {
+      buckets.set(key, { vehicles: zug || [selectedFahrzeug], pieces: [], majFile: zug ? f.majFile : null })
+    }
+    buckets.get(key).pieces.push(f)
   }
   const alle = []
-  const sortedKeys = [...buckets.keys()].sort((a, b) => a - b)
-  for (const vIdx of sortedKeys) {
-    const fz = fahrzeuge[vIdx] || fahrzeuge[0]
-    const liste = new Array(10).fill(fz)
-    const raeume = berechneBeladung(liste, buckets.get(vIdx), variante)
+  for (const b of buckets.values()) {
+    const liste = b.vehicles.map((vi) => fahrzeuge[vi] || fahrzeuge[0])
+    const raeume = berechneBeladung(liste, b.pieces, variante)
     for (const r of raeume) {
-      r.zugewiesenFahrzeug = vIdx
+      const vi = b.vehicles[Math.min(r.fahrzeugIndex, b.vehicles.length - 1)]
+      r.zugewiesenFahrzeug = vi
+      r.majFile = b.majFile
       alle.push(r)
     }
   }
@@ -723,7 +735,7 @@ export default function Beladeplan({ fahrzeuge, selectedFahrzeug, frachtstuecke,
   const [variante, setVariante] = useState(0)
 
   const hatZuteilung = useMemo(
-    () => frachtstuecke.some((f) => f.majFile && majFahrzeug[f.majFile] !== undefined),
+    () => frachtstuecke.some((f) => zugeteilteFahrzeuge(f.majFile, majFahrzeug)),
     [frachtstuecke, majFahrzeug]
   )
 
@@ -823,7 +835,7 @@ export default function Beladeplan({ fahrzeuge, selectedFahrzeug, frachtstuecke,
                       fontSize: '0.9rem',
                       fontWeight: 600,
                     }}>
-                      {fz.name} ({fz.laenge}×{fz.breite}×{fz.hoehe}m) · zugeteilt
+                      {fz.name} ({fz.laenge}×{fz.breite}×{fz.hoehe}m){raum.majFile ? ` · ${raum.majFile.replace(/\.maj$/i, '')}` : ''} · zugeteilt
                     </span>
                   ) : (
                     <select
