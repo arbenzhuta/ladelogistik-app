@@ -131,6 +131,8 @@ export default function Frachtstuecke({
       return `Eingang ${f.eingangA}×${f.eingangB} → Ausgang ${f.ausgangA}×${f.ausgangB} · L ${f.L} · Versatz 1: ${f.versatz1} / Versatz 2: ${f.versatz2} mm`
     if (f.typ === 'bogen')
       return `${f.eingangA}×${f.eingangB}${f.reduziert ? ` → ${f.ausgangA}×${f.eingangB}` : ''} · ${f.grad}° · R ${f.radius} mm`
+    if (f.typ === 'rund')
+      return `ø${f.durchmesser}${f.abzweig ? ` / ø${f.abzweig}` : ''}${f.grad ? ` · ${f.grad}°` : ''} mm (Hüllkörper)`
     return `${f.a} × ${f.b} × L ${f.L} mm`
   }
 

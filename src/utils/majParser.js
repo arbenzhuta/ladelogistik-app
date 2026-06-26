@@ -189,14 +189,38 @@ function findMenge(data, sectionStart, sectionEnd, articleType) {
     return null
   }
 
+  // 902 marker: authoritative for the round "Safe" article types (Spirorohr,
+  // T-Stück, Deckel, Verb.-Rohr, Bogen gepresst). Layout (any byte alignment):
+  // [id=902, flag=0, field3(1 or 9), menge, 0]. The quantity sits 12 bytes
+  // after the marker, like the other variants.
+  function find902() {
+    for (let i = sectionStart; i < sectionEnd - 20; i++) {
+      const v = data[i] | (data[i+1] << 8) | (data[i+2] << 16) | ((data[i+3] << 24) >>> 0)
+      if (v === 902) {
+        const flag = readUint32(data, i + 4)
+        const f3 = readUint32(data, i + 8)
+        if (flag === 0 && (f3 === 1 || f3 === 9) && readUint32(data, i + 16) === 0) {
+          const menge = readUint32(data, i + 12)
+          if (menge > 0 && menge < 10000) return menge
+        }
+      }
+    }
+    return null
+  }
+
   // Priority depends on article type
-  if (articleType === 'spiro') {
+  if (articleType === 'rund') {
+    const m902 = find902()
+    if (m902 !== null) return m902
+  } else if (articleType === 'spiro') {
     const m876 = find876()
     if (m876 !== null) return m876
     const mStrict = findStrict()
     if (mStrict !== null) return mStrict
     const m1036 = find1036()
     if (m1036 !== null) return m1036
+    const m902 = find902()
+    if (m902 !== null) return m902
   } else {
     const mStrict = findStrict()
     if (mStrict !== null) return mStrict
@@ -204,6 +228,8 @@ function findMenge(data, sectionStart, sectionEnd, articleType) {
     if (m1036 !== null) return m1036
     const m876 = find876()
     if (m876 !== null) return m876
+    const m902 = find902()
+    if (m902 !== null) return m902
   }
 
   // Fallback: 866 pattern (4-byte aligned)
@@ -220,10 +246,57 @@ function findMenge(data, sectionStart, sectionEnd, articleType) {
   return 1
 }
 
+// Liest den ersten ø-Durchmesser (z.B. "Deckel EM Safe ø630" -> 630) oder die
+// erste "haupt/abzweig"-Form (z.B. "T-90° TCPH Safe 630/200" -> {haupt:630,
+// abzweig:200}) aus den Strings einer Sektion.
+function findRundMasse(strings) {
+  for (const s of strings) {
+    const m = s.text.match(/ø\s*(\d{2,4})\s*-\s*(\d{1,3})/) // "Bogen Safe ø200-30"
+    if (m) return { haupt: parseInt(m[1]), grad: parseInt(m[2]) }
+  }
+  for (const s of strings) {
+    const m = s.text.match(/(\d{2,4})\s*\/\s*(\d{2,4})/) // "630/200"
+    if (m) return { haupt: parseInt(m[1]), abzweig: parseInt(m[2]) }
+  }
+  for (const s of strings) {
+    const m = s.text.match(/ø\s*(\d{2,4})/) // "ø630"
+    if (m) return { haupt: parseInt(m[1]) }
+  }
+  return {}
+}
+
 function detectArticleType(strings) {
   for (const s of strings) {
     if (s.text.startsWith('Schalld')) {
       return { type: 'schalldaempfer', name: 'Schalldämpfer' }
+    }
+  }
+  // Runde "Safe"-Formteile: T-Stück, Deckel, Verb.-Rohr, Bogen gepresst.
+  // Vor den eckigen Bogen/Kanal-Typen erkennen (sonst würde z.B. "Bogen
+  // gepresst" als eckiger Bogen interpretiert).
+  const has = (re) => strings.some((s) => re.test(s.text))
+  if (has(/TCPH|T-?St(ü|ue)ck/i) || has(/^T-\d+/)) {
+    const m = findRundMasse(strings)
+    return {
+      type: 'rund', kind: 'tstueck',
+      name: `T-Stück ø${m.haupt || '?'}${m.abzweig ? '/' + m.abzweig : ''}`,
+      durchmesser: m.haupt || null, abzweig: m.abzweig || null,
+    }
+  }
+  if (has(/Deckel/i)) {
+    const m = findRundMasse(strings)
+    return { type: 'rund', kind: 'deckel', name: `Deckel ø${m.haupt || '?'}`, durchmesser: m.haupt || null }
+  }
+  if (has(/Verb\.?\s*Rohr/i)) {
+    const m = findRundMasse(strings)
+    return { type: 'rund', kind: 'verbrohr', name: `Verb.-Rohr ø${m.haupt || '?'}`, durchmesser: m.haupt || null }
+  }
+  if (has(/gepresst/i)) {
+    const m = findRundMasse(strings)
+    return {
+      type: 'rund', kind: 'bogen',
+      name: `Bogen gepresst ø${m.haupt || '?'}${m.grad ? ' ' + m.grad + '°' : ''}`,
+      durchmesser: m.haupt || null, grad: m.grad || null,
     }
   }
   for (const s of strings) {
@@ -263,7 +336,7 @@ function detectArticleType(strings) {
   return null
 }
 
-function findPos(strings, data, sectionStart, sectionEnd) {
+function findPos(strings, data, sectionStart, sectionEnd, articleType) {
   for (const s of strings) {
     const t = s.text.trim()
     if (/^Fo\d+[A-Za-z*]?$/.test(t)) return t
@@ -276,8 +349,12 @@ function findPos(strings, data, sectionStart, sectionEnd) {
   // Kurze Positionscodes (z.B. "12", "A3", "Z2", "AU-FO") stehen als kurzer
   // String im Kopf der Sektion und werden vom normalen String-Leser (min. 3
   // Zeichen) verworfen. Daher hier direkt im Kopfbereich danach suchen.
+  // Bei runden Safe-Formteilen ist die Position eine reine Zahl; der Name
+  // ("T-90° TCPH Safe") liefert aber das positions-aehnliche Fragment "T-90".
+  // Deshalb dort die reine Zahl bevorzugen.
+  const preferNumeric = !!articleType && articleType.type === 'rund'
   if (data) {
-    const p = firstHeaderPos(data, sectionStart, Math.min(sectionEnd, sectionStart + 300))
+    const p = firstHeaderPos(data, sectionStart, Math.min(sectionEnd, sectionStart + 300), strings, preferNumeric)
     if (p) return p
   }
   return ''
@@ -291,12 +368,19 @@ const TYPE_RE = /kanal|bogen|spiro|konus|schall|kulissen|etage|muffe|rohr|reduz|
 
 // Liest UTF-16LE-Strings ab Laenge 1 im Kopfbereich und gibt den ersten
 // positions-aehnlichen Token zurueck (Zahl oder Code wie A3 / AU-FO).
-function firstHeaderPos(data, start, end) {
+function firstHeaderPos(data, start, end, strings, preferNumeric) {
+  // Ein Token, das der Anfang eines (laengeren) Artikelnamens ist, ist keine
+  // Position. Z.B. liefert "T-90° TCPH Safe" das Fragment "T-90", das wie ein
+  // Positionscode aussieht; die echte Position ist die nachfolgende Zahl.
+  const isNameFragment = (t) =>
+    !!strings &&
+    strings.some((s) => s.text.length > t.length && s.text.startsWith(t))
+  const candidates = []
   let current = []
   const check = () => {
     if (current.length >= 1) {
       const t = current.join('')
-      if (t.length <= 14 && POS_RE.test(t) && !TYPE_RE.test(t)) return t
+      if (t.length <= 14 && POS_RE.test(t) && !TYPE_RE.test(t) && !isNameFragment(t)) return t
     }
     return null
   }
@@ -307,11 +391,22 @@ function firstHeaderPos(data, start, end) {
       current.push(String.fromCharCode(lo))
     } else {
       const hit = check()
-      if (hit) return hit
+      if (hit) {
+        if (!preferNumeric) return hit
+        candidates.push(hit)
+      }
       current = []
     }
   }
-  return check() || ''
+  const last = check()
+  if (last) {
+    if (!preferNumeric) return last
+    candidates.push(last)
+  }
+  if (preferNumeric) {
+    return candidates.find((c) => /^\d+$/.test(c)) || candidates[0] || ''
+  }
+  return ''
 }
 
 function findArticleName(strings, articleType) {
@@ -374,7 +469,7 @@ function parseSimpleMAJ(data, sectionStarts) {
     const articleType = detectArticleType(strings)
     if (!articleType) continue
     const name = findArticleName(strings, articleType)
-    const pos = findPos(strings, data, start, end)
+    const pos = findPos(strings, data, start, end, articleType)
 
     // Positionen mit Stern (z.B. 1.08_Z_ZU15*) sind Sonder-/Doppel-Einträge
     // ohne gültigen Mass-Block -> nicht importieren.
@@ -526,6 +621,28 @@ function parseSimpleMAJ(data, sectionStarts) {
           schenkel2: bo.f2,
           reduziert: articleType.reduziert,
         }
+      }
+    } else if (articleType.type === 'rund') {
+      // Runde Safe-Formteile: als einfacher Quader-Hüllkörper darstellen.
+      // (Die genaue runde 3D-Geometrie folgt später; das Hüllmass reicht für
+      // die Beladung.) Durchmesser aus den Strings, Länge je nach Formteil.
+      const d = articleType.durchmesser || 200
+      let L
+      if (articleType.kind === 'deckel') L = 60
+      else if (articleType.kind === 'verbrohr') L = 150
+      else if (articleType.kind === 'bogen') L = Math.round(d * 1.3)
+      else L = d // T-Stück: würfelartiges Hüllmass
+      article = {
+        typ: 'rund',
+        kind: articleType.kind,
+        name: articleType.name,
+        durchmesser: d,
+        abzweig: articleType.abzweig || null,
+        grad: articleType.grad || null,
+        a: d,
+        b: d,
+        L,
+        anzahl: menge,
       }
     }
 
