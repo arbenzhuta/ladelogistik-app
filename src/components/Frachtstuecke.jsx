@@ -26,6 +26,8 @@ export default function Frachtstuecke({
   const [formTyp, setFormTyp] = useState('kanal')
   const [form, setForm] = useState({ ...DEFAULT_KANAL })
   const [importStatus, setImportStatus] = useState(null)
+  const [collapsed, setCollapsed] = useState({})
+  const [formCollapsed, setFormCollapsed] = useState(false)
   const fileInputRef = useRef(null)
   const csvInputRef = useRef(null)
 
@@ -197,9 +199,9 @@ export default function Frachtstuecke({
       </div>
 
       <div className="card">
-        <h2>Neues Frachtstück hinzufügen</h2>
+        <h2 onClick={() => setFormCollapsed(!formCollapsed)} style={{ cursor: 'pointer', userSelect: 'none' }}>{formCollapsed ? '▶' : '▼'} Neues Frachtstück hinzufügen</h2>
 
-        <div className="typ-selector">
+        {!formCollapsed && <><div className="typ-selector">
           {['kanal', 'spiro', 'konus'].map((t) => (
             <button
               key={t}
@@ -310,6 +312,7 @@ export default function Frachtstuecke({
         <button className="btn btn-primary" onClick={handleAdd} style={{ marginTop: 16, width: '100%' }}>
           Hinzufügen
         </button>
+        </>}
       </div>
 
       {frachtstuecke.length > 0 && (
@@ -351,8 +354,10 @@ export default function Frachtstuecke({
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                    }}>
-                      <span>{entry.label}</span>
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                    }} onClick={() => setCollapsed((prev) => ({ ...prev, [entry.key]: !prev[entry.key] }))}>
+                      <span>{collapsed[entry.key] ? '▶' : '▼'} {entry.label}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         {entry.key !== '__manuell__' && setMajFahrzeug && fahrzeuge.length > 0 && (
                           <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: '#1a56db', flexWrap: 'wrap' }}>
@@ -365,7 +370,7 @@ export default function Frachtstuecke({
                                   <button
                                     key={fi}
                                     type="button"
-                                    onClick={() => setMajFahrzeug(entry.key, fi)}
+                                    onClick={(e) => { e.stopPropagation(); setMajFahrzeug(entry.key, fi) }}
                                     title={aktiv ? 'Zuteilung entfernen' : 'Diesem Fahrzeug zuteilen'}
                                     style={{
                                       padding: '3px 10px',
@@ -395,6 +400,8 @@ export default function Frachtstuecke({
                 }
                 if (entry.type !== 'item') return null
                 const f = entry.data
+                const groupKey = f.majFile || '__manuell__'
+                if (collapsed[groupKey]) return null
                 return (
                   <div key={f.id} className="fracht-item">
                     <div className="fracht-info">
