@@ -87,13 +87,25 @@ export default function App() {
     localStorage.setItem('auftraege', JSON.stringify(auftraege))
   }, [auftraege])
 
-  const neuerAuftragId = () => (auftraege.reduce((m, e) => Math.max(m, e.id || 0), 0) || 0) + 1
-
   const updateAuftrag = (id, changes) => {
     setAuftraege((prev) => prev.map((e) => (e.id === id ? { ...e, ...changes } : e)))
   }
+  // Neuer Auftrag: Datum + Auftr.Nr. laufen automatisch weiter (fortlaufende
+  // Nummer = höchste vorhandene numerische Auftr.Nr. + 1).
   const addAuftrag = (felder = {}) => {
-    setAuftraege((prev) => [...prev, { ...LEER_AUFTRAG, id: neuerAuftragId(), ...felder }])
+    setAuftraege((prev) => {
+      const id = (prev.reduce((m, e) => Math.max(m, e.id || 0), 0) || 0) + 1
+      const nummern = prev
+        .map((e) => parseInt(String(e.auftrnr).replace(/\D/g, ''), 10))
+        .filter((n) => Number.isFinite(n))
+      const naechsteNr = nummern.length ? Math.max(...nummern) + 1 : 1
+      const letztesDatum = prev.length ? prev[prev.length - 1].datum : ''
+      const heute = new Date().toISOString().slice(0, 10)
+      const neu = { ...LEER_AUFTRAG, id, ...felder }
+      if (!neu.auftrnr) neu.auftrnr = String(naechsteNr)
+      if (!neu.datum) neu.datum = letztesDatum || heute
+      return [...prev, neu]
+    })
   }
   const removeAuftrag = (id) => {
     setAuftraege((prev) => prev.filter((e) => e.id !== id))
