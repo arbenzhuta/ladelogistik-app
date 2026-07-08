@@ -5,6 +5,9 @@ import Frachtstuecke from './components/Frachtstuecke.jsx'
 import Beladeplan from './components/Beladeplan.jsx'
 import Routenplanung from './components/Routenplanung.jsx'
 import Transportliste from './components/Transportliste.jsx'
+import Auftragsjournal from './components/Auftragsjournal.jsx'
+import Produktionsplanung from './components/Produktionsplanung.jsx'
+import { SEED_AUFTRAEGE, migrateFromTransportliste, LEER_AUFTRAG } from './utils/auftraege.js'
 
 let nextId = 10
 
@@ -20,6 +23,18 @@ export default function App() {
   const [selectedFahrzeug, setSelectedFahrzeug] = useState(0)
   const [frachtstuecke, setFrachtstuecke] = useState([])
   const [incomingRoute, setIncomingRoute] = useState(null)
+  const [auftraege, setAuftraege] = useState(() => {
+    const stored = localStorage.getItem('auftraege')
+    if (stored) {
+      try { return JSON.parse(stored) } catch { /* ignore */ }
+    }
+    // Migration: alte Transportliste übernehmen, falls vorhanden.
+    const tl = localStorage.getItem('transportliste')
+    if (tl) {
+      try { return migrateFromTransportliste(JSON.parse(tl)) } catch { /* ignore */ }
+    }
+    return SEED_AUFTRAEGE
+  })
   const [majFahrzeug, setMajFahrzeug] = useState(() => {
     const stored = localStorage.getItem('majFahrzeug')
     if (stored) {
@@ -68,6 +83,22 @@ export default function App() {
     localStorage.setItem('majFahrzeug', JSON.stringify(majFahrzeug))
   }, [majFahrzeug])
 
+  useEffect(() => {
+    localStorage.setItem('auftraege', JSON.stringify(auftraege))
+  }, [auftraege])
+
+  const neuerAuftragId = () => (auftraege.reduce((m, e) => Math.max(m, e.id || 0), 0) || 0) + 1
+
+  const updateAuftrag = (id, changes) => {
+    setAuftraege((prev) => prev.map((e) => (e.id === id ? { ...e, ...changes } : e)))
+  }
+  const addAuftrag = (felder = {}) => {
+    setAuftraege((prev) => [...prev, { ...LEER_AUFTRAG, id: neuerAuftragId(), ...felder }])
+  }
+  const removeAuftrag = (id) => {
+    setAuftraege((prev) => prev.filter((e) => e.id !== id))
+  }
+
   const addFrachtstueck = (stueck) => {
     setFrachtstuecke((prev) => [...prev, { ...stueck, id: nextId++ }])
   }
@@ -99,7 +130,9 @@ export default function App() {
     { id: 'fracht', label: 'Frachtstücke' },
     { id: 'beladeplan', label: '3D-Beladeplan' },
     { id: 'route', label: 'Navigation' },
+    { id: 'journal', label: 'Auftragsjournal' },
     { id: 'transport', label: 'Transportliste' },
+    { id: 'produktion', label: 'Produktionsplanung' },
   ]
 
   const primaryColor = '#2563eb'
@@ -162,8 +195,30 @@ export default function App() {
         {activeTab === 'route' && (
           <Routenplanung fahrzeuge={fahrzeuge} incomingRoute={incomingRoute} />
         )}
+        {activeTab === 'journal' && (
+          <Auftragsjournal
+            auftraege={auftraege}
+            updateAuftrag={updateAuftrag}
+            addAuftrag={addAuftrag}
+            removeAuftrag={removeAuftrag}
+            frachtstuecke={frachtstuecke}
+          />
+        )}
         {activeTab === 'transport' && (
-          <Transportliste frachtstuecke={frachtstuecke} onPlanRoute={planRoute} />
+          <Transportliste
+            auftraege={auftraege}
+            updateAuftrag={updateAuftrag}
+            addAuftrag={addAuftrag}
+            removeAuftrag={removeAuftrag}
+            frachtstuecke={frachtstuecke}
+            onPlanRoute={planRoute}
+          />
+        )}
+        {activeTab === 'produktion' && (
+          <Produktionsplanung
+            auftraege={auftraege}
+            updateAuftrag={updateAuftrag}
+          />
         )}
       </main>
     </div>

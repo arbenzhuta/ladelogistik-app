@@ -1,15 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
-
-const STORAGE_KEY = 'transportliste'
-
-const SEED = [
-  { id: 1, erledigt: false, liefertermin: '2026-06-25', zeit: '13:35', auftrnr: '26204270', auftrnrKunde: '', kunde: 'LKE AG, Zizers', objekt: 'Umbau Hof Grand Resort, Bad Ragaz/ UG Teil 1 / ZUL 1 1. Teil', abladestelle: 'Baustelle', chauffeur: 'Kuoni', fahrzeug: '0 extern', anhaenger: false, bemerkung: 'Lieferwagen ohne Anhänger', gewicht: '' },
-  { id: 2, erledigt: false, liefertermin: '2026-06-25', zeit: '14:12', auftrnr: '26204353', auftrnrKunde: '', kunde: 'Hemair', objekt: 'Glattwiesenstrasse 24, Zürich / 26103508', abladestelle: 'Hemair', chauffeur: 'Flavio', fahrzeug: '1 GR29403', anhaenger: true, bemerkung: '', gewicht: '' },
-  { id: 3, erledigt: true, liefertermin: '2026-06-25', zeit: '08:27', auftrnr: '26204469', auftrnrKunde: '', kunde: 'Spaeter AG, Nänikon', objekt: 'Lager, Nänikon (41832167)', abladestelle: 'Magazin', chauffeur: 'Flavio', fahrzeug: '1 GR29403', anhaenger: true, bemerkung: '', gewicht: '' },
-  { id: 4, erledigt: false, liefertermin: '2026-06-25', zeit: '05:56', auftrnr: '26204364', auftrnrKunde: '', kunde: 'Kunz AG, Klosters', objekt: 'MFH Soldanella, Talstrasse 73, Klosters', abladestelle: 'Baustelle', chauffeur: 'Tiago', fahrzeug: '3 GR100703', anhaenger: true, bemerkung: '', gewicht: '' },
-  { id: 5, erledigt: false, liefertermin: '2026-06-25', zeit: '08:32', auftrnr: '26204370', auftrnrKunde: '', kunde: 'Kunz AG, Klosters', objekt: 'MFH Soldanella, Talstrasse 73, Klosters', abladestelle: 'Baustelle', chauffeur: 'Tiago', fahrzeug: '3 GR100703', anhaenger: true, bemerkung: '', gewicht: '' },
-  { id: 6, erledigt: false, liefertermin: '2026-06-25', zeit: '08:42', auftrnr: '26204373', auftrnrKunde: '', kunde: 'LKE AG, Zizers', objekt: 'Umbau Hof Grand Resort, Bad Ragaz/ EG Teil 4 Technikraum', abladestelle: 'Baustelle', chauffeur: 'Tiago', fahrzeug: '3 GR100703', anhaenger: false, bemerkung: '', gewicht: '' },
-]
+import { useState, useMemo } from 'react'
+import { EditCell, badgeStyle, formatDatum } from './TableCells.jsx'
+import { majNummer, cleanAdresse } from '../utils/auftraege.js'
 
 const GRUPPIER_FELDER = [
   { id: 'chauffeur', label: 'Chauffeur' },
@@ -19,120 +10,25 @@ const GRUPPIER_FELDER = [
   { id: '', label: 'Keine' },
 ]
 
-// Deterministische, gut lesbare Badge-Farbe aus einem Text.
-function badgeStyle(text) {
-  if (!text) return { background: '#f0f0f5', color: '#888' }
-  let h = 0
-  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) % 360
-  return { background: `hsl(${h}, 65%, 88%)`, color: `hsl(${h}, 60%, 30%)` }
-}
+const SPALTEN = ['Aufträge', 'Liefertermin', 'Auftr.Nr.', 'Auftr.Nr. Kunde', 'Kunde', 'Objekt', 'Abladestelle', 'Chauffeur', 'Fahrzeug', 'Bemerkung Transp.', 'Gewicht', '']
 
-function formatDatum(iso) {
-  if (!iso) return '–'
-  const [y, m, d] = iso.split('-')
-  if (!y || !m || !d) return iso
-  return `${parseInt(d)}.${parseInt(m)}.${y}`
-}
-
-// MAJ-Dateiname -> reine Auftrags-/Datei-Nr. (z.B. "26204378.MAJ" -> "26204378")
-function majNummer(name) {
-  if (!name) return ''
-  return name.replace(/\.maj$/i, '').trim()
-}
-
-// Objekt-Text -> brauchbare Adresse fuer die Routenplanung. Entfernt die
-// angehaengte Auftrags-Nr. ("... / 26103508") fuer besseres Geocoding.
-function cleanAdresse(objekt) {
-  if (!objekt) return ''
-  return objekt.replace(/\s*\/\s*\d+\s*$/, '').trim()
-}
-
-const LEER = {
-  liefertermin: '', zeit: '', auftrnr: '', auftrnrKunde: '', kunde: '',
-  objekt: '', abladestelle: '', chauffeur: '', fahrzeug: '', anhaenger: false,
-  bemerkung: '', gewicht: '',
-}
-
-// Eine einzeln editierbare Zelle: Klick -> Eingabefeld, Enter/Blur speichert,
-// Escape bricht ab. So lässt sich jedes Feld einzeln bearbeiten.
-function EditCell({ value, onCommit, type = 'text', options, badge, placeholder = '–', nowrap }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value ?? '')
-  const inputRef = useRef(null)
-  const listId = useRef('dl_' + Math.random().toString(36).slice(2)).current
-
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus()
-      if (inputRef.current.select) inputRef.current.select()
-    }
-  }, [editing])
-
-  const start = () => { setDraft(value ?? ''); setEditing(true) }
-  const commit = () => { setEditing(false); if (draft !== value) onCommit(draft) }
-  const cancel = () => { setEditing(false); setDraft(value ?? '') }
-
-  if (editing) {
-    return (
-      <td className={nowrap ? 'tl-nowrap' : ''}>
-        <input
-          ref={inputRef}
-          className="tl-edit-input"
-          type={type}
-          value={draft}
-          list={options ? listId : undefined}
-          placeholder={placeholder}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => { if (e.key === 'Enter') commit(); else if (e.key === 'Escape') cancel() }}
-        />
-        {options && (
-          <datalist id={listId}>
-            {options.map((o) => <option key={o} value={o} />)}
-          </datalist>
-        )}
-      </td>
-    )
-  }
-
-  return (
-    <td className={`tl-cell ${nowrap ? 'tl-nowrap' : ''}`} onClick={start} title="Klicken zum Bearbeiten">
-      {value
-        ? (badge ? <span className="tl-badge" style={badgeStyle(value)}>{value}</span> : value)
-        : <span className="tl-empty">–</span>}
-    </td>
-  )
-}
-
-export default function Transportliste({ frachtstuecke = [], onPlanRoute }) {
-  const [eintraege, setEintraege] = useState(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      try { return JSON.parse(stored) } catch { /* ignore */ }
-    }
-    return SEED
-  })
+export default function Transportliste({ auftraege = [], updateAuftrag, addAuftrag, removeAuftrag, frachtstuecke = [], onPlanRoute }) {
   const [gruppierung, setGruppierung] = useState('chauffeur')
   const [filterDatum, setFilterDatum] = useState('')
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(eintraege))
-  }, [eintraege])
-
-  // Verfügbare MAJ-Datei-Nummern aus den importierten Frachtstücken.
   const majNummern = useMemo(
     () => [...new Set(frachtstuecke.map((f) => majNummer(f.majFile)).filter(Boolean))].sort(),
     [frachtstuecke]
   )
 
   const datumOptionen = useMemo(
-    () => [...new Set(eintraege.map((e) => e.liefertermin).filter(Boolean))].sort(),
-    [eintraege]
+    () => [...new Set(auftraege.map((e) => e.liefertermin).filter(Boolean))].sort(),
+    [auftraege]
   )
 
   const gefiltert = useMemo(
-    () => eintraege.filter((e) => !filterDatum || e.liefertermin === filterDatum),
-    [eintraege, filterDatum]
+    () => auftraege.filter((e) => !filterDatum || e.liefertermin === filterDatum),
+    [auftraege, filterDatum]
   )
 
   const gruppen = useMemo(() => {
@@ -143,47 +39,39 @@ export default function Transportliste({ frachtstuecke = [], onPlanRoute }) {
       map.get(key).push(e)
     }
     for (const arr of map.values()) {
-      arr.sort((a, b) => (a.liefertermin + a.zeit).localeCompare(b.liefertermin + b.zeit))
+      arr.sort((a, b) => ((a.liefertermin || '') + (a.zeit || '')).localeCompare((b.liefertermin || '') + (b.zeit || '')))
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [gefiltert, gruppierung])
 
-  const updateFeld = (id, feld, wert) => {
-    setEintraege((prev) => prev.map((e) => (e.id === id ? { ...e, [feld]: wert } : e)))
-  }
-
+  const updateFeld = (id, feld, wert) => updateAuftrag(id, { [feld]: wert })
   const toggleErledigt = (id) => {
-    setEintraege((prev) => prev.map((e) => (e.id === id ? { ...e, erledigt: !e.erledigt } : e)))
+    const e = auftraege.find((x) => x.id === id)
+    updateAuftrag(id, { erledigt: !e?.erledigt })
   }
 
-  const removeEintrag = (id) => {
-    setEintraege((prev) => prev.filter((e) => e.id !== id))
+  const addEintrag = () => addAuftrag({ liefertermin: filterDatum || '', datum: filterDatum || '' })
+
+  const ausMaj = () => {
+    const vorhanden = new Set(auftraege.map((e) => e.auftrnr))
+    majNummern.filter((nr) => !vorhanden.has(nr)).forEach((nr) => {
+      addAuftrag({ auftrnr: nr, liefertermin: filterDatum || '', datum: filterDatum || '' })
+    })
   }
 
-  const neuerId = () => (eintraege.reduce((m, e) => Math.max(m, e.id), 0) || 0) + 1
-
-  const addEintrag = () => {
-    setEintraege((prev) => [...prev, { ...LEER, id: neuerId(), erledigt: false, liefertermin: filterDatum || '' }])
-  }
-
-  // Aus Auftraegen die Stopps bauen: Objekt-Adressen in Liefer-Reihenfolge.
   const rowsZuStops = (rows) => {
     const sortiert = [...rows].sort((a, b) =>
-      (a.liefertermin + a.zeit).localeCompare(b.liefertermin + b.zeit)
+      ((a.liefertermin || '') + (a.zeit || '')).localeCompare((b.liefertermin || '') + (b.zeit || ''))
     )
-    return sortiert
-      .map((r) => ({ address: cleanAdresse(r.objekt), unload_time_min: 30 }))
-      .filter((s) => s.address)
+    return sortiert.map((r) => ({ address: cleanAdresse(r.objekt), unload_time_min: 30 })).filter((s) => s.address)
   }
 
-  // Eine gemeinsame Route aus den Auftraegen.
   const planeRoute = (rows, name = '') => {
     if (!onPlanRoute) return
     const stops = rowsZuStops(rows)
     if (stops.length) onPlanRoute([{ name, stops }])
   }
 
-  // Pro Fahrzeug eine eigene Route: Auftraege nach Fahrzeug gruppieren.
   const planeRoutenProFahrzeug = (rows) => {
     if (!onPlanRoute) return
     const map = new Map()
@@ -202,18 +90,6 @@ export default function Transportliste({ frachtstuecke = [], onPlanRoute }) {
     if (plans.length) onPlanRoute(plans)
   }
 
-  // Pro importierter MAJ-Datei einen Auftrag erzeugen (Auftr.Nr = Datei-Nr).
-  const ausMaj = () => {
-    const vorhanden = new Set(eintraege.map((e) => e.auftrnr))
-    let id = neuerId()
-    const neu = majNummern
-      .filter((nr) => !vorhanden.has(nr))
-      .map((nr) => ({ ...LEER, id: id++, erledigt: false, auftrnr: nr, liefertermin: filterDatum || '' }))
-    if (neu.length) setEintraege((prev) => [...prev, ...neu])
-  }
-
-  const SPALTEN = ['Aufträge', 'Liefertermin', 'Auftr.Nr.', 'Auftr.Nr. Kunde', 'Kunde', 'Objekt', 'Abladestelle', 'Chauffeur', 'Fahrzeug', 'Bemerkung Transp.', 'Gewicht', '']
-
   return (
     <div>
       <div className="card">
@@ -222,20 +98,14 @@ export default function Transportliste({ frachtstuecke = [], onPlanRoute }) {
             <label className="tl-filter-label">Liefertermin</label>
             <select value={filterDatum} onChange={(e) => setFilterDatum(e.target.value)} className="tl-select">
               <option value="">Alle</option>
-              {datumOptionen.map((d) => (
-                <option key={d} value={d}>{formatDatum(d)}</option>
-              ))}
+              {datumOptionen.map((d) => <option key={d} value={d}>{formatDatum(d)}</option>)}
             </select>
-            {filterDatum && (
-              <button className="btn btn-secondary btn-small" onClick={() => setFilterDatum('')}>Zurücksetzen</button>
-            )}
+            {filterDatum && <button className="btn btn-secondary btn-small" onClick={() => setFilterDatum('')}>Zurücksetzen</button>}
           </div>
           <div className="tl-toolbar-right">
             <label className="tl-filter-label">Gruppieren</label>
             <select value={gruppierung} onChange={(e) => setGruppierung(e.target.value)} className="tl-select">
-              {GRUPPIER_FELDER.map((g) => (
-                <option key={g.id} value={g.id}>{g.label}</option>
-              ))}
+              {GRUPPIER_FELDER.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
             </select>
             {majNummern.length > 0 && (
               <button className="btn btn-secondary btn-small" onClick={ausMaj} title="Pro importierter MAJ-Datei einen Auftrag anlegen">+ aus MAJ</button>
@@ -251,7 +121,7 @@ export default function Transportliste({ frachtstuecke = [], onPlanRoute }) {
             🚚 Route pro Fahrzeug planen
           </button>
         </div>
-        <p className="tl-hint">Tipp: Jedes Feld einzeln anklicken zum Bearbeiten. „Auftr.Nr." = MAJ-Datei-Nr.</p>
+        <p className="tl-hint">Tipp: Jedes Feld einzeln anklicken zum Bearbeiten. Änderungen erscheinen auch im Auftragsjournal.</p>
       </div>
 
       <div className="card">
@@ -260,9 +130,7 @@ export default function Transportliste({ frachtstuecke = [], onPlanRoute }) {
         ) : (
           <div className="tl-table-wrap">
             <table className="tl-table">
-              <thead>
-                <tr>{SPALTEN.map((s, i) => <th key={i}>{s}</th>)}</tr>
-              </thead>
+              <thead><tr>{SPALTEN.map((s, i) => <th key={i}>{s}</th>)}</tr></thead>
               <tbody>
                 {gruppen.map(([gruppe, rows]) => (
                   <GruppeBlock
@@ -274,7 +142,7 @@ export default function Transportliste({ frachtstuecke = [], onPlanRoute }) {
                     majNummern={majNummern}
                     onToggle={toggleErledigt}
                     onUpdate={updateFeld}
-                    onRemove={removeEintrag}
+                    onRemove={removeAuftrag}
                     onPlanRoute={onPlanRoute ? () => planeRoute(rows) : null}
                   />
                 ))}
@@ -311,11 +179,7 @@ function GruppeBlock({ gruppe, rows, gruppierung, spaltenAnzahl, majNummern, onT
       {rows.map((e) => (
         <tr key={e.id} className="tl-row">
           <td>
-            <button
-              className={`tl-status ${e.erledigt ? 'done' : ''}`}
-              onClick={() => onToggle(e.id)}
-              title={e.erledigt ? 'Erledigt' : 'Offen'}
-            >
+            <button className={`tl-status ${e.erledigt ? 'done' : ''}`} onClick={() => onToggle(e.id)} title={e.erledigt ? 'Erledigt' : 'Offen'}>
               {e.erledigt ? '✓' : ''}
             </button>
           </td>
@@ -327,11 +191,9 @@ function GruppeBlock({ gruppe, rows, gruppierung, spaltenAnzahl, majNummern, onT
           <EditCell value={e.abladestelle} badge onCommit={(v) => onUpdate(e.id, 'abladestelle', v)} />
           <EditCell value={e.chauffeur} badge onCommit={(v) => onUpdate(e.id, 'chauffeur', v)} />
           <FahrzeugCell e={e} onUpdate={onUpdate} />
-          <EditCell value={e.bemerkung} onCommit={(v) => onUpdate(e.id, 'bemerkung', v)} />
+          <EditCell value={e.bemerkungTransp} onCommit={(v) => onUpdate(e.id, 'bemerkungTransp', v)} />
           <EditCell value={e.gewicht} nowrap onCommit={(v) => onUpdate(e.id, 'gewicht', v)} />
-          <td>
-            <button className="btn btn-danger btn-small" onClick={() => onRemove(e.id)} title="Löschen">✕</button>
-          </td>
+          <td><button className="btn btn-danger btn-small" onClick={() => onRemove(e.id)} title="Löschen">✕</button></td>
         </tr>
       ))}
     </>
@@ -344,8 +206,8 @@ function LieferterminCell({ e, onUpdate }) {
     return (
       <td className="tl-nowrap">
         <div className="tl-dt-edit">
-          <input type="date" value={e.liefertermin} onChange={(ev) => onUpdate(e.id, 'liefertermin', ev.target.value)} />
-          <input type="time" value={e.zeit} onChange={(ev) => onUpdate(e.id, 'zeit', ev.target.value)} onBlur={() => setEditing(false)} />
+          <input type="date" value={e.liefertermin || ''} onChange={(ev) => onUpdate(e.id, 'liefertermin', ev.target.value)} />
+          <input type="time" value={e.zeit || ''} onChange={(ev) => onUpdate(e.id, 'zeit', ev.target.value)} onBlur={() => setEditing(false)} />
           <button className="btn btn-secondary btn-small" onClick={() => setEditing(false)}>OK</button>
         </div>
       </td>
@@ -364,8 +226,8 @@ function FahrzeugCell({ e, onUpdate }) {
     return (
       <td className="tl-nowrap">
         <div className="tl-dt-edit">
-          <input className="tl-edit-input" type="text" value={e.fahrzeug} placeholder="Fahrzeug" onChange={(ev) => onUpdate(e.id, 'fahrzeug', ev.target.value)} autoFocus />
-          <label className="tl-check"><input type="checkbox" checked={e.anhaenger} onChange={(ev) => onUpdate(e.id, 'anhaenger', ev.target.checked)} /> Anhänger</label>
+          <input className="tl-edit-input" type="text" value={e.fahrzeug || ''} placeholder="Fahrzeug" onChange={(ev) => onUpdate(e.id, 'fahrzeug', ev.target.value)} autoFocus />
+          <label className="tl-check"><input type="checkbox" checked={!!e.anhaenger} onChange={(ev) => onUpdate(e.id, 'anhaenger', ev.target.checked)} /> Anhänger</label>
           <button className="btn btn-secondary btn-small" onClick={() => setEditing(false)}>OK</button>
         </div>
       </td>
