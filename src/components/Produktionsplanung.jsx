@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { EditCell, StatusCell, CheckCell, badgeStyle, formatDatum } from './TableCells.jsx'
+import { EditCell, StatusCell, CheckCell, formatDatum } from './TableCells.jsx'
 
 const SPALTEN = [
   'Prod.Termin', 'Auft.Nr.', 'Kunde', 'Objekt', 'auf Abruf', 'Reserv.',
@@ -29,7 +29,7 @@ export default function Produktionsplanung({ auftraege, updateAuftrag }) {
   const summe = (feld) => gefiltert.reduce((s, e) => s + num(e[feld]), 0)
   const offen = (feld, statusFeld) => gefiltert.reduce((s, e) => s + (e[statusFeld] ? 0 : num(e[feld])), 0)
 
-  const karten = [
+  const kats = [
     { label: 'Kanäle', total: summe('kanaele'), off: offen('kanaele', 'statusKA') },
     { label: 'Formstücke', total: summe('formstuecke'), off: offen('formstuecke', 'statusFST') },
     { label: 'Armaturen', total: summe('armaturen'), off: offen('armaturen', 'statusArmaturen') },
@@ -50,30 +50,35 @@ export default function Produktionsplanung({ auftraege, updateAuftrag }) {
   const u = (id) => (feld, wert) => updateAuftrag(id, { [feld]: wert })
 
   return (
-    <div>
-      <div className="card">
-        <h2 style={{ marginTop: 0 }}>Produktionsplanung Werkstatt</h2>
-        <div className="tl-toolbar-left">
-          <label className="tl-filter-label">Prod.Termin</label>
-          <select value={filterTermin} onChange={(e) => setFilterTermin(e.target.value)} className="tl-select">
+    <div className="at-view">
+      <h1 className="at-title">Produktionsplanung Werkstatt</h1>
+      <div className="at-filterbar">
+        <div className="at-filter-pill">
+          <span>Prod.Termin is</span>
+          <select value={filterTermin} onChange={(e) => setFilterTermin(e.target.value)}>
             <option value="">Alle</option>
             {terminOptionen.map((d) => <option key={d} value={d}>{formatDatum(d)}</option>)}
           </select>
-          {filterTermin && <button className="btn btn-secondary btn-small" onClick={() => setFilterTermin('')}>Zurücksetzen</button>}
         </div>
+        {filterTermin && <button className="at-link" onClick={() => setFilterTermin('')}>Zurücksetzen</button>}
       </div>
 
       <div className="pp-karten">
-        {karten.map((k) => (
+        {kats.map((k) => (
           <div key={k.label} className="pp-karte">
             <div className="pp-karte-label">{k.label} Total</div>
             <div className="pp-karte-total">{k.total}</div>
-            <div className="pp-karte-offen">{k.label} offen: <strong style={{ color: k.off > 0 ? '#dc2626' : '#16a34a' }}>{k.off}</strong></div>
+          </div>
+        ))}
+        {kats.map((k) => (
+          <div key={k.label + '-o'} className="pp-karte">
+            <div className="pp-karte-label">{k.label} offen</div>
+            <div className="pp-karte-total" style={{ color: k.off > 0 ? '#dc2626' : '#16a34a' }}>{k.off}</div>
           </div>
         ))}
       </div>
 
-      <div className="card">
+      <div className="at-tablecard">
         {gefiltert.length === 0 ? (
           <p style={{ color: '#888' }}>Keine Aufträge. Aufträge im Auftragsjournal anlegen.</p>
         ) : (
@@ -81,55 +86,33 @@ export default function Produktionsplanung({ auftraege, updateAuftrag }) {
             <table className="tl-table">
               <thead><tr>{SPALTEN.map((s, i) => <th key={i}>{s}</th>)}</tr></thead>
               <tbody>
-                {gruppen.map(([termin, rows]) => (
-                  <TerminBlock key={termin} termin={termin} rows={rows} anzahl={SPALTEN.length}>
-                    {rows.map((e) => {
-                      const set = u(e.id)
-                      return (
-                        <tr key={e.id} className="tl-row">
-                          <td className="tl-nowrap">{e.prodTermin ? formatDatum(e.prodTermin) : <span className="tl-empty">–</span>}</td>
-                          <td className="tl-nowrap">{e.auftrnr || <span className="tl-empty">–</span>}</td>
-                          <EditCell value={e.kunde} badge onCommit={(v) => set('kunde', v)} />
-                          <EditCell value={e.objekt} onCommit={(v) => set('objekt', v)} />
-                          <CheckCell checked={e.aufAbruf} onToggle={() => set('aufAbruf', !e.aufAbruf)} />
-                          <CheckCell checked={e.reserv} onToggle={() => set('reserv', !e.reserv)} />
-                          <EditCell value={e.kanaele} type="number" align="center" nowrap onCommit={(v) => set('kanaele', v)} />
-                          <StatusCell on={e.statusKA} onToggle={() => set('statusKA', !e.statusKA)} />
-                          <EditCell value={e.formstuecke} type="number" align="center" nowrap onCommit={(v) => set('formstuecke', v)} />
-                          <StatusCell on={e.statusFST} onToggle={() => set('statusFST', !e.statusFST)} />
-                          <EditCell value={e.rund} type="number" align="center" nowrap onCommit={(v) => set('rund', v)} />
-                          <StatusCell on={e.statusR} onToggle={() => set('statusR', !e.statusR)} />
-                          <EditCell value={e.armaturen} type="number" align="center" nowrap onCommit={(v) => set('armaturen', v)} />
-                          <StatusCell on={e.statusArmaturen} onToggle={() => set('statusArmaturen', !e.statusArmaturen)} />
-                          <EditCell value={e.bemerkungProd} onCommit={(v) => set('bemerkungProd', v)} />
-                        </tr>
-                      )
-                    })}
-                  </TerminBlock>
-                ))}
+                {gruppen.flatMap(([, rows]) => rows).map((e) => {
+                  const set = u(e.id)
+                  return (
+                    <tr key={e.id} className="tl-row">
+                      <td className="tl-nowrap">{e.prodTermin ? formatDatum(e.prodTermin) : <span className="tl-empty">–</span>}</td>
+                      <td className="tl-nowrap">{e.auftrnr || <span className="tl-empty">–</span>}</td>
+                      <EditCell value={e.kunde} badge onCommit={(v) => set('kunde', v)} />
+                      <EditCell value={e.objekt} onCommit={(v) => set('objekt', v)} />
+                      <CheckCell checked={e.aufAbruf} onToggle={() => set('aufAbruf', !e.aufAbruf)} />
+                      <CheckCell checked={e.reserv} onToggle={() => set('reserv', !e.reserv)} />
+                      <EditCell value={e.kanaele} type="number" align="center" nowrap onCommit={(v) => set('kanaele', v)} />
+                      <StatusCell on={e.statusKA} onToggle={() => set('statusKA', !e.statusKA)} />
+                      <EditCell value={e.formstuecke} type="number" align="center" nowrap onCommit={(v) => set('formstuecke', v)} />
+                      <StatusCell on={e.statusFST} onToggle={() => set('statusFST', !e.statusFST)} />
+                      <EditCell value={e.rund} type="number" align="center" nowrap onCommit={(v) => set('rund', v)} />
+                      <StatusCell on={e.statusR} onToggle={() => set('statusR', !e.statusR)} />
+                      <EditCell value={e.armaturen} type="number" align="center" nowrap onCommit={(v) => set('armaturen', v)} />
+                      <StatusCell on={e.statusArmaturen} onToggle={() => set('statusArmaturen', !e.statusArmaturen)} />
+                      <EditCell value={e.bemerkungProd} onCommit={(v) => set('bemerkungProd', v)} />
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
     </div>
-  )
-}
-
-function TerminBlock({ termin, rows, anzahl, children }) {
-  return (
-    <>
-      <tr className="tl-group-row">
-        <td colSpan={anzahl}>
-          <div className="tl-group-head">
-            <div>
-              <span className="tl-group-badge" style={badgeStyle(termin)}>{termin === '—' ? 'Ohne Termin' : formatDatum(termin)}</span>
-              <span className="tl-group-count">{rows.length}</span>
-            </div>
-          </div>
-        </td>
-      </tr>
-      {children}
-    </>
   )
 }

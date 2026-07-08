@@ -125,44 +125,61 @@ export default function App() {
     })
   }
 
-  const TABS = [
-    { id: 'fahrzeuge', label: 'Fahrzeuge' },
-    { id: 'fracht', label: 'Frachtstücke' },
-    { id: 'beladeplan', label: '3D-Beladeplan' },
-    { id: 'route', label: 'Navigation' },
-    { id: 'journal', label: 'Auftragsjournal' },
-    { id: 'transport', label: 'Transportliste' },
-    { id: 'produktion', label: 'Produktionsplanung' },
+  // Airtable-artige Seitenleiste: Gruppe (Base) -> Ansicht(en).
+  const NAV = [
+    { group: 'Auftragsjournal AA', icon: '📖', items: [{ id: 'journal', label: 'Auftragsnummer' }] },
+    { group: 'Transportliste AA', icon: '🚚', items: [{ id: 'transport', label: 'Transportliste' }] },
+    { group: 'Produktionsplanung AA', icon: '🏭', items: [{ id: 'produktion', label: 'Produktionsplanung Werkstatt' }] },
+    { group: 'Werkzeuge', icon: '🧰', items: [
+      { id: 'fahrzeuge', label: 'Fahrzeuge' },
+      { id: 'fracht', label: 'Frachtstücke' },
+      { id: 'beladeplan', label: '3D-Beladeplan' },
+      { id: 'route', label: 'Navigation' },
+    ] },
   ]
 
-  const primaryColor = '#2563eb'
-  const headerBg = '#1a1a2e'
-  const appName = 'Ladelogistik'
-  const subtitle = 'Fahrzeuge, Frachtstücke & 3D-Beladepläne'
+  const aktiveGruppe = NAV.find((g) => g.items.some((i) => i.id === activeTab)) || NAV[0]
+  const aktivesItem = aktiveGruppe.items.find((i) => i.id === activeTab) || aktiveGruppe.items[0]
 
   return (
-    <div className="app">
-      <header className="app-header" style={{ background: headerBg, borderRadius: 12, padding: '16px 24px', marginBottom: 24 }}>
-        <div className="header-row">
-          <h1 style={{ color: '#fff', margin: 0, fontSize: '1.5rem' }}>{appName}</h1>
+    <div className="at-layout">
+      <aside className="at-sidebar">
+        <div className="at-workspace">
+          <span className="at-workspace-icon">◆</span>
+          <span>2026 Albin<br />Allenspach</span>
+          <span className="at-caret">▾</span>
         </div>
-        <p style={{ color: 'rgba(255,255,255,0.7)', margin: '4px 0 0', fontSize: '0.85rem' }}>{subtitle}</p>
-      </header>
+        <nav className="at-nav">
+          {NAV.map((g) => (
+            <div className="at-nav-group" key={g.group}>
+              <div className="at-nav-top"><span className="at-nav-ico">{g.icon}</span>{g.group}</div>
+              {g.items.map((it) => (
+                <div
+                  key={it.id}
+                  className={`at-nav-item ${activeTab === it.id ? 'active' : ''}`}
+                  onClick={() => setActiveTab(it.id)}
+                >
+                  {it.label}
+                </div>
+              ))}
+            </div>
+          ))}
+        </nav>
+      </aside>
 
-      <nav className="tab-nav">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-            style={activeTab === tab.id ? { color: primaryColor, borderBottomColor: primaryColor } : {}}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      <div className="at-main">
+        <div className="at-topbar">
+          <div className="at-crumb">
+            <span className="at-crumb-base">{aktiveGruppe.group}</span>
+            <span className="at-crumb-sep">›</span>
+            <span className="at-crumb-cur">{aktivesItem.label}</span>
+          </div>
+          <div className="at-tools">
+            <span>Gruppe</span><span>Filter</span><span>Sortieren</span><span className="at-tools-search">⌕</span>
+          </div>
+        </div>
 
-      <main className="tab-content">
+        <main className="at-content">
         {activeTab === 'fahrzeuge' && (
           <Fahrzeugverwaltung
             fahrzeuge={fahrzeuge}
@@ -220,7 +237,8 @@ export default function App() {
             updateAuftrag={updateAuftrag}
           />
         )}
-      </main>
+        </main>
+      </div>
     </div>
   )
 }

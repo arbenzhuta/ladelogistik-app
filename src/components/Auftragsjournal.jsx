@@ -50,28 +50,25 @@ export default function Auftragsjournal({ auftraege, updateAuftrag, addAuftrag, 
   const u = (id) => (feld, wert) => updateAuftrag(id, { [feld]: wert })
 
   return (
-    <div>
-      <div className="card">
-        <div className="tl-toolbar">
-          <div className="tl-toolbar-left">
-            <label className="tl-filter-label">Datum</label>
-            <select value={filterDatum} onChange={(e) => setFilterDatum(e.target.value)} className="tl-select">
-              <option value="">Alle</option>
-              {datumOptionen.map((d) => <option key={d} value={d}>{formatDatum(d)}</option>)}
-            </select>
-            {filterDatum && <button className="btn btn-secondary btn-small" onClick={() => setFilterDatum('')}>Zurücksetzen</button>}
-          </div>
-          <div className="tl-toolbar-right">
-            {majNummern.length > 0 && (
-              <button className="btn btn-secondary btn-small" onClick={ausMaj} title="Pro importierter MAJ-Datei einen Auftrag anlegen">+ aus MAJ</button>
-            )}
-            <button className="btn btn-primary btn-small" onClick={() => addAuftrag({ datum: filterDatum || '' })}>+ Auftrag</button>
-          </div>
+    <div className="at-view">
+      <div className="at-filterbar">
+        <div className="at-filter-pill">
+          <span>Datum is</span>
+          <select value={filterDatum} onChange={(e) => setFilterDatum(e.target.value)}>
+            <option value="">Alle</option>
+            {datumOptionen.map((d) => <option key={d} value={d}>{formatDatum(d)}</option>)}
+          </select>
         </div>
-        <p className="tl-hint">Auftragsjournal – jedes Feld anklicken zum Bearbeiten. Änderungen erscheinen automatisch in Transportliste und Produktionsplanung.</p>
+        {filterDatum && <button className="at-link" onClick={() => setFilterDatum('')}>Zurücksetzen</button>}
+        <div className="at-filterbar-right">
+          {majNummern.length > 0 && (
+            <button className="btn btn-secondary btn-small" onClick={ausMaj} title="Pro importierter MAJ-Datei einen Auftrag anlegen">+ aus MAJ</button>
+          )}
+          <button className="btn btn-primary btn-small" onClick={() => addAuftrag({ datum: filterDatum || '' })}>+ Auftrag</button>
+        </div>
       </div>
 
-      <div className="card">
+      <div className="at-tablecard">
         {gefiltert.length === 0 ? (
           <p style={{ color: '#888' }}>Keine Aufträge. Mit „+ Auftrag" oder „+ aus MAJ" anlegen.</p>
         ) : (

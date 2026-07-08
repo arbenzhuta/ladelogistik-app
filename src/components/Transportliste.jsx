@@ -91,40 +91,37 @@ export default function Transportliste({ auftraege = [], updateAuftrag, addAuftr
   }
 
   return (
-    <div>
-      <div className="card">
-        <div className="tl-toolbar">
-          <div className="tl-toolbar-left">
-            <label className="tl-filter-label">Liefertermin</label>
-            <select value={filterDatum} onChange={(e) => setFilterDatum(e.target.value)} className="tl-select">
-              <option value="">Alle</option>
-              {datumOptionen.map((d) => <option key={d} value={d}>{formatDatum(d)}</option>)}
-            </select>
-            {filterDatum && <button className="btn btn-secondary btn-small" onClick={() => setFilterDatum('')}>Zurücksetzen</button>}
-          </div>
-          <div className="tl-toolbar-right">
-            <label className="tl-filter-label">Gruppieren</label>
-            <select value={gruppierung} onChange={(e) => setGruppierung(e.target.value)} className="tl-select">
-              {GRUPPIER_FELDER.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
-            </select>
-            {majNummern.length > 0 && (
-              <button className="btn btn-secondary btn-small" onClick={ausMaj} title="Pro importierter MAJ-Datei einen Auftrag anlegen">+ aus MAJ</button>
-            )}
-            <button className="btn btn-primary btn-small" onClick={addEintrag}>+ Auftrag</button>
-          </div>
+    <div className="at-view">
+      <div className="at-filterbar">
+        <div className="at-filter-pill">
+          <span>Liefertermin is</span>
+          <select value={filterDatum} onChange={(e) => setFilterDatum(e.target.value)}>
+            <option value="">Alle</option>
+            {datumOptionen.map((d) => <option key={d} value={d}>{formatDatum(d)}</option>)}
+          </select>
         </div>
-        <div className="tl-toolbar-route">
+        {filterDatum && <button className="at-link" onClick={() => setFilterDatum('')}>Zurücksetzen</button>}
+        <div className="at-filter-pill">
+          <span>Gruppe</span>
+          <select value={gruppierung} onChange={(e) => setGruppierung(e.target.value)}>
+            {GRUPPIER_FELDER.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
+          </select>
+        </div>
+        <div className="at-filterbar-right">
           <button className="btn btn-success btn-small" onClick={() => planeRoute(gefiltert)} disabled={!gefiltert.length} title="Alle sichtbaren Aufträge als gemeinsame Route in die Navigation laden">
-            🗺️ Route aus ganzer Liste planen
+            🗺️ Route (Liste)
           </button>
           <button className="btn btn-primary btn-small" onClick={() => planeRoutenProFahrzeug(gefiltert)} disabled={!gefiltert.length} title="Pro Fahrzeug eine eigene Route in die Navigation laden">
-            🚚 Route pro Fahrzeug planen
+            🚚 Route/Fahrzeug
           </button>
+          {majNummern.length > 0 && (
+            <button className="btn btn-secondary btn-small" onClick={ausMaj} title="Pro importierter MAJ-Datei einen Auftrag anlegen">+ aus MAJ</button>
+          )}
+          <button className="btn btn-primary btn-small" onClick={addEintrag}>+ Auftrag</button>
         </div>
-        <p className="tl-hint">Tipp: Jedes Feld einzeln anklicken zum Bearbeiten. Änderungen erscheinen auch im Auftragsjournal.</p>
       </div>
 
-      <div className="card">
+      <div className="at-tablecard">
         {gefiltert.length === 0 ? (
           <p style={{ color: '#888' }}>Keine Transportaufträge. Mit „+ Auftrag" einen Eintrag anlegen.</p>
         ) : (

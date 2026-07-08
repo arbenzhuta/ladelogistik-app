@@ -1054,9 +1054,12 @@
 /* Produktionsplanung – Summen-Karten */
 .pp-karten {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 14px;
   margin-bottom: 20px;
+}
+@media (max-width: 900px) {
+  .pp-karten { grid-template-columns: repeat(2, 1fr); }
 }
 
 .pp-karte {
@@ -1084,4 +1087,148 @@
 .pp-karte-offen {
   font-size: 0.82rem;
   color: #6b7280;
+}
+
+/* ===== Airtable-Look: Layout mit Seitenleiste ===== */
+.at-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #fff;
+}
+
+.at-sidebar {
+  width: 232px;
+  flex: 0 0 232px;
+  background: linear-gradient(180deg, #1f335a 0%, #172444 100%);
+  color: #fff;
+  padding: 14px 10px 24px;
+}
+
+.at-workspace {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.98rem;
+  line-height: 1.15;
+  padding: 8px 8px 16px;
+}
+.at-workspace-icon { color: #7aa2ff; }
+.at-caret { margin-left: auto; opacity: 0.7; font-size: 0.75rem; }
+
+.at-nav-group { margin-top: 4px; }
+.at-nav-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #cdd8ef;
+}
+.at-nav-ico { font-size: 0.9rem; }
+.at-nav-item {
+  padding: 8px 10px 8px 32px;
+  margin: 1px 0;
+  font-size: 0.85rem;
+  color: #dbe3f4;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.at-nav-item:hover { background: rgba(255,255,255,0.08); }
+.at-nav-item.active {
+  background: rgba(255,255,255,0.92);
+  color: #1b2b4d;
+  font-weight: 600;
+}
+
+.at-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.at-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 1px solid #ececf0;
+}
+.at-crumb { font-size: 0.86rem; display: flex; align-items: center; gap: 8px; }
+.at-crumb-base { color: #555; }
+.at-crumb-sep { color: #bbb; }
+.at-crumb-cur { color: #16833f; font-weight: 600; }
+.at-tools { display: flex; align-items: center; gap: 18px; color: #6a6a72; font-size: 0.82rem; }
+.at-tools span { cursor: pointer; }
+.at-tools-search { font-size: 1rem; }
+
+.at-content { padding: 18px 20px 40px; overflow-x: auto; }
+
+.at-view { max-width: 100%; }
+.at-title { font-size: 1.7rem; font-weight: 700; color: #1a1a2e; margin: 4px 0 16px; }
+
+.at-filterbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.at-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f3f4f8;
+  border: 1px solid #e3e5ee;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 0.82rem;
+  color: #444;
+}
+.at-filter-pill select {
+  border: none;
+  background: transparent;
+  font-size: 0.82rem;
+  color: #1a1a2e;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+.at-link {
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+.at-filterbar-right { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+
+.at-tablecard { border: 1px solid #ececf0; border-radius: 10px; overflow: hidden; }
+
+/* Runde Häkchen-Zellen (Status + Checkboxen) im Airtable-Stil */
+.at-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid #d3d6df;
+  background: #fff;
+  color: #cfd3dd;
+  font-size: 0.7rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.12s;
+}
+.at-check:hover { border-color: #16a34a; color: #16a34a; }
+.at-check.on {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
 }

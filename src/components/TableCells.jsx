@@ -68,27 +68,27 @@ export function EditCell({ value, onCommit, type = 'text', options, badge, place
   )
 }
 
-// Grüner Haken-Status (an/aus), wie in Airtable die Status-Spalten.
+// Grüner Haken-Status (an/aus), wie in Airtable die Status-Spalten:
+// erledigt = grün gefüllt, offen = blasser Kreis mit hellem Haken.
 export function StatusCell({ on, onToggle, title }) {
   return (
     <td style={{ textAlign: 'center' }}>
       <button
-        className={`tl-status ${on ? 'done' : ''}`}
-        style={{ margin: '0 auto', width: 22, height: 22, fontSize: '0.8rem' }}
+        className={`at-check ${on ? 'on' : ''}`}
         onClick={onToggle}
         title={title || (on ? 'Erledigt' : 'Offen')}
       >
-        {on ? '✓' : ''}
+        ✓
       </button>
     </td>
   )
 }
 
-// Checkbox-Zelle (auf Abruf, Keine Produktion, Reserv.)
+// Checkbox-Zelle (auf Abruf, Keine Produktion, Reserv.) – gleicher Look.
 export function CheckCell({ checked, onToggle, title }) {
   return (
     <td style={{ textAlign: 'center' }}>
-      <input type="checkbox" checked={!!checked} onChange={onToggle} title={title} style={{ cursor: 'pointer', width: 16, height: 16 }} />
+      <button className={`at-check ${checked ? 'on' : ''}`} onClick={onToggle} title={title}>✓</button>
     </td>
   )
 }
