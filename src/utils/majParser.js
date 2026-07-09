@@ -1027,6 +1027,34 @@ function parseComplexMAJ(data) {
   return articles
 }
 
+// Revit/BIM-Export-Variante: jeder Artikel beginnt mit einem Import-Pfad-
+// Marker (z.B. "N:/Ablagestruktur HEM-AA/Import/Import-Eckig/"), gefolgt vom
+// Typnamen und dem Positionscode (z.B. "Kanal", "E1.ABL.1"). Der bisherige
+// './Ablagestruktur'-Marker steht in diesen Dateien nur am Dateiende und
+// erfasst nicht die einzelnen Positionen. Hier werden die Artikel-Sektionen
+// aus den Import-Pfad-Markern abgeleitet (eine Sektion je Position).
+function findImportPathSections(data) {
+  const all = readUtf16StringsRange(data, 0, data.length)
+  const anchors = []
+  const seen = new Set()
+  for (let idx = 0; idx < all.length; idx++) {
+    const s = all[idx]
+    if (!/Ablagestruktur.*Import|[/\\]Import[-/\\]/i.test(s.text)) continue
+    let posText = ''
+    for (let k = idx + 1; k < all.length && all[k].pos < s.pos + 220; k++) {
+      const t = all[k].text.trim()
+      if (t.length <= 14 && POS_RE.test(t) && !TYPE_RE.test(t)) {
+        posText = t
+        break
+      }
+    }
+    if (!posText || seen.has(posText)) continue
+    seen.add(posText)
+    anchors.push(s.pos)
+  }
+  return anchors.sort((a, b) => a - b)
+}
+
 export function parseMAJFile(arrayBuffer) {
   const rawData = new Uint8Array(arrayBuffer)
   const data = decompressMAJ(rawData)
@@ -1041,20 +1069,40 @@ export function parseMAJFile(arrayBuffer) {
 
   const isComplex = earlyKanalCount > 10
 
+  // Kandidaten-Ergebnisse sammeln, am Ende das mit den meisten Artikeln wählen.
+  const candidates = []
+
+  // Import-Pfad-Sektionen (Revit/BIM-Export). Nur aktiv, wenn solche Marker
+  // existieren – andere Dateien bleiben dadurch unverändert.
+  const importStarts = findImportPathSections(data)
+  if (importStarts.length > 0) {
+    const arts = parseSimpleMAJ(data, importStarts)
+    if (arts.length > 0) candidates.push(arts)
+  }
+
   if (isComplex) {
     const complexArticles = parseComplexMAJ(data)
     const sectionArticles =
       sectionStarts.length > 0 ? parseSimpleMAJ(data, sectionStarts) : []
     const combined = [...complexArticles, ...sectionArticles]
-    for (let i = 0; i < combined.length; i++) {
-      combined[i].farbe = FARBEN[i % FARBEN.length]
-    }
-    if (combined.length > 0) return combined
+    if (combined.length > 0) candidates.push(combined)
   }
 
-  if (sectionStarts.length === 0) {
+  if (sectionStarts.length > 0) {
+    candidates.push(parseSimpleMAJ(data, sectionStarts))
+  }
+
+  if (candidates.length === 0) {
     throw new Error('Keine Artikel in der MAJ-Datei gefunden.')
   }
 
-  return parseSimpleMAJ(data, sectionStarts)
+  // Die vollständigste Interpretation gewinnt (meiste erkannte Positionen).
+  let best = candidates[0]
+  for (const c of candidates) {
+    if (c.length > best.length) best = c
+  }
+  for (let i = 0; i < best.length; i++) {
+    best[i].farbe = FARBEN[i % FARBEN.length]
+  }
+  return best
 }
