@@ -40,10 +40,30 @@ export default function Auftragsjournal({ auftraege, updateAuftrag, addAuftrag, 
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [gefiltert])
 
+  // Mengen einer MAJ-Datei nach Journal-Spalten zusammenfassen.
+  // kanal -> Kanäle, bogen/konus -> Formstücke, spiro/rund -> Rund.
+  const mengenFuer = (nr) => {
+    const teile = frachtstuecke.filter((f) => majNummer(f.majFile) === nr)
+    const summe = (typen) =>
+      teile.filter((t) => typen.includes(t.typ)).reduce((s, t) => s + (Number(t.anzahl) || Number(t.menge) || 1), 0)
+    const kanaele = summe(['kanal'])
+    const formstuecke = summe(['bogen', 'konus'])
+    const rund = summe(['spiro', 'rund'])
+    return {
+      kanaele: kanaele ? String(kanaele) : '',
+      formstuecke: formstuecke ? String(formstuecke) : '',
+      rund: rund ? String(rund) : '',
+    }
+  }
+
+  // Pro MAJ-Datei einen Auftrag anlegen bzw. vorhandenen aktualisieren –
+  // überträgt jeweils alle geparsten Mengen individuell.
   const ausMaj = () => {
-    const vorhanden = new Set(auftraege.map((e) => e.auftrnr))
-    majNummern.filter((nr) => !vorhanden.has(nr)).forEach((nr) => {
-      addAuftrag({ auftrnr: nr, datum: filterDatum || '' })
+    majNummern.forEach((nr) => {
+      const mengen = mengenFuer(nr)
+      const exist = auftraege.find((e) => e.auftrnr === nr)
+      if (exist) updateAuftrag(exist.id, mengen)
+      else addAuftrag({ auftrnr: nr, datum: filterDatum || '', ...mengen })
     })
   }
 
