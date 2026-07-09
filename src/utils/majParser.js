@@ -1039,7 +1039,7 @@ function findImportPathSections(data) {
   const seen = new Set()
   for (let idx = 0; idx < all.length; idx++) {
     const s = all[idx]
-    if (!/Ablagestruktur.*Import|[/\\]Import[-/\\]/i.test(s.text)) continue
+    if (!/Ablagestruktur[- ]?HEM-AA[/\\]/i.test(s.text)) continue
     let posText = ''
     for (let k = idx + 1; k < all.length && all[k].pos < s.pos + 220; k++) {
       const t = all[k].text.trim()
