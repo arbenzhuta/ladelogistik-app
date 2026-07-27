@@ -326,6 +326,16 @@ function detectArticleType(strings) {
     }
   }
   for (const s of strings) {
+    if (/^Kulisse/i.test(s.text)) {
+      return { type: 'kulisse', name: s.text.trim() }
+    }
+  }
+  for (const s of strings) {
+    if (/^Boden[\s-]*Rahmen/i.test(s.text)) {
+      return { type: 'rahmen', name: 'Boden-Rahmen' }
+    }
+  }
+  for (const s of strings) {
     if (s.text.startsWith('Kanal-cut')) {
       return { type: 'kanal_cut', name: 'Kanal-cut' }
     }
@@ -372,7 +382,10 @@ function firstHeaderPos(data, start, end, strings, preferNumeric) {
   // Ein Token, das der Anfang eines (laengeren) Artikelnamens ist, ist keine
   // Position. Z.B. liefert "T-90° TCPH Safe" das Fragment "T-90", das wie ein
   // Positionscode aussieht; die echte Position ist die nachfolgende Zahl.
+  // Reine Zahlen-Positionen (z.B. "6") sind nie ein Namens-Fragment –
+  // Fragmente wie "T-90" enthalten immer Buchstaben.
   const isNameFragment = (t) =>
+    /[A-Za-z]/.test(t) &&
     !!strings &&
     strings.some((s) => s.text.length > t.length && s.text.startsWith(t))
   const candidates = []
@@ -641,6 +654,40 @@ function parseSimpleMAJ(data, sectionStarts) {
         grad: articleType.grad || null,
         a: d,
         b: d,
+        L,
+        anzahl: menge,
+      }
+    } else if (articleType.type === 'kulisse' || articleType.type === 'rahmen') {
+      // Kulissen (Schalldämpfer-Einsätze) und Boden-Rahmen: einfacher
+      // Quader-Hüllkörper. Masse wenn vorhanden, sonst konservative Vorgabe.
+      let a = 400,
+        b = 400,
+        L = 500
+      const abl = findKanalABL(dimGroups)
+      if (abl) {
+        a = abl.a
+        b = abl.b
+        L = abl.L
+      } else {
+        for (const group of dimGroups) {
+          if (
+            group.length >= 3 &&
+            group[0].val >= 50 &&
+            group[1].val >= 50 &&
+            group[2].val >= 50
+          ) {
+            a = group[0].val
+            b = group[1].val
+            L = group[2].val
+            break
+          }
+        }
+      }
+      article = {
+        typ: articleType.type,
+        name: articleType.name,
+        a,
+        b,
         L,
         anzahl: menge,
       }
@@ -1040,16 +1087,23 @@ function findImportPathSections(data) {
   for (let idx = 0; idx < all.length; idx++) {
     const s = all[idx]
     if (!/Ablagestruktur[- ]?HEM-AA[/\\]/i.test(s.text)) continue
+    // Positionscode in der Kopfzeile suchen (z.B. E1.ABL.1). Schalldämpfer
+    // haben nur einen einstelligen Code ("1".."6"), der vom String-Leser
+    // (min. 3 Zeichen) verworfen wird – solche Sektionen werden zusätzlich
+    // über den Typnamen "Schalldämpfer" erkannt, damit sie nicht fehlen.
     let posText = ''
+    let isSchall = false
     for (let k = idx + 1; k < all.length && all[k].pos < s.pos + 220; k++) {
       const t = all[k].text.trim()
-      if (t.length <= 14 && POS_RE.test(t) && !TYPE_RE.test(t)) {
+      if (/^Schalld/i.test(t)) isSchall = true
+      if (!posText && t.length <= 14 && POS_RE.test(t) && !TYPE_RE.test(t)) {
         posText = t
-        break
       }
     }
-    if (!posText || seen.has(posText)) continue
-    seen.add(posText)
+    // Schalldämpfer nach Byte-Position deduplizieren (kein eindeutiger Code).
+    const key = isSchall && !posText ? 'schall@' + s.pos : posText
+    if (!key || seen.has(key)) continue
+    seen.add(key)
     anchors.push(s.pos)
   }
   return anchors.sort((a, b) => a - b)
