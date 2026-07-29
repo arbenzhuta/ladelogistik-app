@@ -3,7 +3,7 @@ import { EditCell, StatusCell, CheckCell, DatumZeitCell, badgeStyle, formatDatum
 import { LIEFERARTEN, majNummer } from '../utils/auftraege.js'
 
 const SPALTEN = [
-  'Aufträge', 'Visum', 'Auft.Nr.', 'Kunde', 'Objekt', 'Liefertermin', 'Prod.Termin',
+  'Aufträge', 'Datum', 'Visum', 'Auft.Nr.', 'Kunde', 'Objekt', 'Liefertermin', 'Prod.Termin',
   'Keine Prod.', 'auf Abruf', 'Lieferart', 'Bemerkung Transp.',
   'Kanäle', 'Status-KA', 'Formstücke', 'Status-FST', 'Rund', 'Status-R',
   'Armaturen', 'Status-Arm.', 'Bemerkung Prod.', '',
@@ -109,6 +109,7 @@ export default function Auftragsjournal({ auftraege, updateAuftrag, addAuftrag, 
                       return (
                         <tr key={e.id} className="tl-row">
                           <StatusCell on={e.erledigt} onToggle={() => set('erledigt', !e.erledigt)} />
+                          <DatumZeitCell datum={e.datum} onDatum={(v) => set('datum', v)} />
                           <EditCell value={e.visum} badge nowrap onCommit={(v) => set('visum', v)} />
                           <EditCell value={e.auftrnr} options={majNummern} nowrap onCommit={(v) => set('auftrnr', v)} />
                           <EditCell value={e.kunde} badge onCommit={(v) => set('kunde', v)} />
