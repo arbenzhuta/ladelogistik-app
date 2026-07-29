@@ -35,6 +35,14 @@ export default function App() {
     }
     return SEED_AUFTRAEGE
   })
+  // Fortlaufendes "Arbeitsdatum": neue Aufträge übernehmen dieses Datum. Wird
+  // aktualisiert, sobald ein Datum gesetzt/geändert wird. Bleibt bis zur
+  // nächsten Änderung bestehen; Standard = zuletzt genutztes oder heutiges Datum.
+  const heuteISO = () => new Date().toISOString().slice(0, 10)
+  const [arbeitsDatum, setArbeitsDatum] = useState(() => {
+    const stored = localStorage.getItem('arbeitsDatum')
+    return stored || heuteISO()
+  })
   const [majFahrzeug, setMajFahrzeug] = useState(() => {
     const stored = localStorage.getItem('majFahrzeug')
     if (stored) {
@@ -87,23 +95,29 @@ export default function App() {
     localStorage.setItem('auftraege', JSON.stringify(auftraege))
   }, [auftraege])
 
+  useEffect(() => {
+    localStorage.setItem('arbeitsDatum', arbeitsDatum || '')
+  }, [arbeitsDatum])
+
+  // Datum ändern merkt sich das neue Datum als Arbeitsdatum -> folgende neue
+  // Aufträge laufen mit diesem Datum weiter, bis es wieder geändert wird.
   const updateAuftrag = (id, changes) => {
+    if (changes.datum) setArbeitsDatum(changes.datum)
     setAuftraege((prev) => prev.map((e) => (e.id === id ? { ...e, ...changes } : e)))
   }
   // Neuer Auftrag: Datum + Auftr.Nr. laufen automatisch weiter (fortlaufende
-  // Nummer = höchste vorhandene numerische Auftr.Nr. + 1).
+  // Nummer = höchste vorhandene numerische Auftr.Nr. + 1; Datum = Arbeitsdatum).
   const addAuftrag = (felder = {}) => {
+    const datum = felder.datum || arbeitsDatum || heuteISO()
+    if (datum !== arbeitsDatum) setArbeitsDatum(datum)
     setAuftraege((prev) => {
       const id = (prev.reduce((m, e) => Math.max(m, e.id || 0), 0) || 0) + 1
       const nummern = prev
         .map((e) => parseInt(String(e.auftrnr).replace(/\D/g, ''), 10))
         .filter((n) => Number.isFinite(n))
       const naechsteNr = nummern.length ? Math.max(...nummern) + 1 : 1
-      const letztesDatum = prev.length ? prev[prev.length - 1].datum : ''
-      const heute = new Date().toISOString().slice(0, 10)
-      const neu = { ...LEER_AUFTRAG, id, ...felder }
+      const neu = { ...LEER_AUFTRAG, id, ...felder, datum }
       if (!neu.auftrnr) neu.auftrnr = String(naechsteNr)
-      if (!neu.datum) neu.datum = letztesDatum || heute
       return [...prev, neu]
     })
   }
