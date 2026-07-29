@@ -97,7 +97,13 @@ export default function Auftragsjournal({ auftraege, updateAuftrag, addAuftrag, 
               <thead><tr>{SPALTEN.map((s, i) => <th key={i}>{s}</th>)}</tr></thead>
               <tbody>
                 {gruppen.map(([datum, rows]) => (
-                  <Datumsblock key={datum} datum={datum} rows={rows} anzahl={SPALTEN.length}>
+                  <Datumsblock
+                    key={datum}
+                    datum={datum}
+                    rows={rows}
+                    anzahl={SPALTEN.length}
+                    onChangeDatum={(neu) => rows.forEach((r) => updateAuftrag(r.id, { datum: neu }))}
+                  >
                     {rows.map((e) => {
                       const set = u(e.id)
                       return (
@@ -137,14 +143,37 @@ export default function Auftragsjournal({ auftraege, updateAuftrag, addAuftrag, 
   )
 }
 
-function Datumsblock({ datum, rows, anzahl, children }) {
+function Datumsblock({ datum, rows, anzahl, children, onChangeDatum }) {
+  const [editing, setEditing] = useState(false)
+  const istDatum = datum && datum !== '—'
   return (
     <>
       <tr className="tl-group-row">
         <td colSpan={anzahl}>
           <div className="tl-group-head">
             <div>
-              <span className="tl-group-badge" style={badgeStyle(datum)}>{datum === '—' ? 'Ohne Datum' : formatDatum(datum)}</span>
+              {editing ? (
+                <span className="tl-dt-edit">
+                  <input
+                    type="date"
+                    autoFocus
+                    value={istDatum ? datum : ''}
+                    onChange={(e) => e.target.value && onChangeDatum(e.target.value)}
+                    onBlur={() => setEditing(false)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditing(false) }}
+                  />
+                  <button className="btn btn-secondary btn-small" onClick={() => setEditing(false)}>OK</button>
+                </span>
+              ) : (
+                <span
+                  className="tl-group-badge"
+                  style={{ ...badgeStyle(datum), cursor: 'pointer' }}
+                  onClick={() => setEditing(true)}
+                  title="Klicken zum Ändern des Datums"
+                >
+                  {istDatum ? formatDatum(datum) : 'Ohne Datum'}
+                </span>
+              )}
               <span className="tl-group-count">{rows.length}</span>
             </div>
           </div>
